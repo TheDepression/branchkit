@@ -588,7 +588,7 @@
                                         },
                                             e('div', { className: 'element-label' }, elem.label),
                                             elem.type === 'image' && elem.content && e('img', { src: elem.content }),
-                                            elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: true, loop: elem.loop, muted: true }),
+                                            elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: true, loop: elem.loop, playsInline: true }),
                                             elem.type === 'text' && e('div', { 
                                     className: 'element-text',
                                     style: { 
@@ -1359,7 +1359,7 @@
                                 onClick: () => handleClick(elem)
                             },
                                 elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
-                                elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
+                                elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
                                 elem.type === 'text' && e('div', { 
                                     className: 'element-text', 
                                     style: { 
@@ -1408,6 +1408,9 @@
         .canvas { width: 1024px; height: 576px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
         .elem { position: absolute; }
         .elem img, .elem video { width: 100%; height: 100%; object-fit: cover; }
+        .elem video { pointer-events: none; }
+        .elem video::-webkit-media-controls { display: none !important; }
+        .elem video::-webkit-media-controls-enclosure { display: none !important; }
         .elem-text { padding: 15px; border-radius: 6px; text-align: center; }
         .elem-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .elem-timer { background: rgba(247,147,26,0.8); color: #fff; font-size: 3rem; font-weight: 900; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-family: monospace; }
@@ -1621,7 +1624,7 @@ function createElemHTML(e, withTransition) {
     
     let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + transClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
     if (e.type === "image" && e.content) h += '<img src="' + e.content + '">';
-    if (e.type === "video" && e.content) h += '<video ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></video>';
+    if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></video>';
     if (e.type === "text") h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + (e.textBgColor || "rgba(0,0,0,0.8)") + '">' + e.content + '</div>';
     if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + '">' + (e.content || "Button") + '</div>';
     if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></audio>';
