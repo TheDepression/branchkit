@@ -151,7 +151,9 @@
                 transitionDuration: 0.5,
                 textColor: '#ffffff',
                 textBgColor: 'rgba(0,0,0,0.8)',
-                textSize: 24
+                textSize: 24,
+                buttonTextColor: '#ffffff',
+                buttonTextSize: 20
             };
         }
 
@@ -601,7 +603,7 @@
                                             'rgba(0,0,0,0.8)'
                                     }
                                 }, elem.content),
-                                            elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color } }, elem.content || 'Button'),
+                                            elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color, color: elem.buttonTextColor || '#ffffff', fontSize: (elem.buttonTextSize || 20) + 'px' } }, elem.content || 'Button'),
                                             elem.type === 'audio' && e('div', { className: 'element-audio' }, '🔊'),
                                             elem.type === 'timer' && e('div', { className: 'element-timer' }, elem.countdown),
                                             elem.type === 'draggable' && e('div', { className: 'element-draggable' },
@@ -732,6 +734,14 @@
                                 selectedElement.type === 'button' && e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Button Color'),
                                     e('input', { type: 'color', className: 'form-input', value: selectedElement.color, onChange: (ev) => updateElement(selectedElement.id, { color: ev.target.value }) })
+                                ),
+                                selectedElement.type === 'button' && e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Text Color'),
+                                    e('input', { type: 'color', className: 'form-input', value: selectedElement.buttonTextColor || '#ffffff', onChange: (ev) => updateElement(selectedElement.id, { buttonTextColor: ev.target.value }) })
+                                ),
+                                selectedElement.type === 'button' && e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Text Size'),
+                                    e('input', { type: 'number', className: 'form-input', value: selectedElement.buttonTextSize || 20, onChange: (ev) => updateElement(selectedElement.id, { buttonTextSize: parseInt(ev.target.value) || 20 }) })
                                 ),
                                 selectedElement.type === 'hotspot' && e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Interaction Mode'),
@@ -1372,7 +1382,7 @@
                                             'rgba(0,0,0,0.8)'
                                     } 
                                 }, elem.content),
-                                elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color } }, elem.content || 'Button'),
+                                elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color, color: elem.buttonTextColor || '#ffffff', fontSize: (elem.buttonTextSize || 20) + 'px' } }, elem.content || 'Button'),
                                 elem.type === 'audio' && elem.content && e('audio', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop }),
                                 elem.type === 'timer' && e('div', { className: 'element-timer' }, activeTimers[elem.id] !== undefined ? activeTimers[elem.id] : elem.countdown),
                                 elem.type === 'draggable' && (
@@ -1414,7 +1424,7 @@
         .elem-text { padding: 15px; border-radius: 6px; text-align: center; }
         .elem-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .elem-timer { background: rgba(247,147,26,0.8); color: #fff; font-size: 3rem; font-weight: 900; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-family: monospace; }
-        .elem-draggable { cursor: grab; display: flex; align-items: center; justify-content: center; user-select: none; }
+        .elem-draggable { cursor: grab; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: none; }
         .elem-draggable:active { cursor: grabbing; }
         .elem-draggable img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
         .elem-hotspot-visible { border: 3px dashed rgba(255,0,0,0.5); background: rgba(255,0,0,0.05); }
@@ -1618,7 +1628,7 @@ function createElemHTML(e, withTransition) {
     const transClass = withTransition && e.transition && e.transition !== "none" && !isHiding ? " trans-" + e.transition : (isHiding ? " trans-" + e.transition + "-out" : "");
     const transDur = e.transitionDuration || 0.5;
     const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s";
-    const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \\'' + e.id + '\\')"' : "";
+    const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \\'' + e.id + '\\')" ontouchstart="handleDragStart(event, \\'' + e.id + '\\')"' : "";
     const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\\'' + e.id + '\\')"' : "";
     const hotspotClass = (e.type === "hotspot" && e.showInGame) ? " elem-hotspot-visible" : "";
     
@@ -1626,7 +1636,7 @@ function createElemHTML(e, withTransition) {
     if (e.type === "image" && e.content) h += '<img src="' + e.content + '">';
     if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></video>';
     if (e.type === "text") h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + (e.textBgColor || "rgba(0,0,0,0.8)") + '">' + e.content + '</div>';
-    if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + '">' + (e.content || "Button") + '</div>';
+    if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px">' + (e.content || "Button") + '</div>';
     if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></audio>';
     if (e.type === "timer") h += '<div class="elem-timer">' + (timerCountdowns[e.id] !== undefined ? timerCountdowns[e.id] : e.countdown) + '</div>';
     if (e.type === "draggable") {
@@ -1694,6 +1704,16 @@ function updateInventory() {
     }
 }
 
+function getEventPos(ev) {
+    if (ev.touches && ev.touches.length > 0) {
+        return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+    }
+    if (ev.changedTouches && ev.changedTouches.length > 0) {
+        return { x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY };
+    }
+    return { x: ev.clientX, y: ev.clientY };
+}
+
 function handleDragStart(ev, elemId) {
     ev.preventDefault();
     const s = STEPS.find(x => x.id === current);
@@ -1703,12 +1723,15 @@ function handleDragStart(ev, elemId) {
     const rect = ev.target.getBoundingClientRect();
     const canvas = document.getElementById("game");
     const canvasRect = canvas.getBoundingClientRect();
-    dragOffset.x = ev.clientX - rect.left;
-    dragOffset.y = ev.clientY - rect.top;
-    dragPos.x = ev.clientX - canvasRect.left;
-    dragPos.y = ev.clientY - canvasRect.top;
+    const pos = getEventPos(ev);
+    dragOffset.x = pos.x - rect.left;
+    dragOffset.y = pos.y - rect.top;
+    dragPos.x = pos.x - canvasRect.left;
+    dragPos.y = pos.y - canvasRect.top;
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchmove', handleDragMove, { passive: false });
+    document.addEventListener('touchend', handleDragEnd);
 }
 
 function handleDragMove(ev) {
@@ -1716,8 +1739,9 @@ function handleDragMove(ev) {
     ev.preventDefault();
     const canvas = document.getElementById("game");
     const rect = canvas.getBoundingClientRect();
-    dragPos.x = ev.clientX - rect.left;
-    dragPos.y = ev.clientY - rect.top;
+    const pos = getEventPos(ev);
+    dragPos.x = pos.x - rect.left;
+    dragPos.y = pos.y - rect.top;
     const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
     if (draggedDiv) {
         draggedDiv.style.left = (dragPos.x - dragOffset.x) + 'px';
@@ -1730,8 +1754,9 @@ function handleDragEnd(ev) {
     const s = STEPS.find(x => x.id === current);
     const canvas = document.getElementById("game");
     const rect = canvas.getBoundingClientRect();
-    const dropX = ev.clientX - rect.left;
-    const dropY = ev.clientY - rect.top;
+    const pos = getEventPos(ev);
+    const dropX = pos.x - rect.left;
+    const dropY = pos.y - rect.top;
     s.elements.filter(e => e.type === "hotspot" && visible[e.id] && e.hotspotMode !== "click").forEach(h => {
         if (dropX >= h.x && dropX <= h.x + h.width && dropY >= h.y && dropY <= h.y + h.height) {
             s.events.forEach(ev => {
@@ -1741,6 +1766,8 @@ function handleDragEnd(ev) {
     });
     document.removeEventListener('mousemove', handleDragMove);
     document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchmove', handleDragMove);
+    document.removeEventListener('touchend', handleDragEnd);
     const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
     if (draggedDiv) {
         draggedDiv.style.left = draggedElem.x + 'px';
