@@ -195,7 +195,10 @@
                 objectShape: 'rect',
                 objectColor: '#f7931a',
                 scaleX: 1,
-                scaleY: 1
+                scaleY: 1,
+                rotation: 0,
+                flipH: false,
+                flipV: false
             };
         }
 
@@ -494,10 +497,20 @@
             };
 
             const handleMouseDown = (ev, elemId) => {
+                const elem = currentStep?.elements.find(e => e.id === elemId);
                 if (ev.target.classList.contains('resize-handle')) {
                     setDragging({ type: 'resize', elemId });
                 } else {
-                    setDragging({ type: 'move', elemId, startX: ev.clientX, startY: ev.clientY });
+                    const canvas = document.querySelector('.preview');
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = (ev.clientX - rect.left) / scale;
+                    const mouseY = (ev.clientY - rect.top) / scale;
+                    setDragging({ 
+                        type: 'move', 
+                        elemId, 
+                        offsetX: mouseX - (elem?.x || 0),
+                        offsetY: mouseY - (elem?.y || 0)
+                    });
                 }
                 setSelectedElementId(elemId);
             };
@@ -508,16 +521,19 @@
                 if (!elem) return;
 
                 if (dragging.type === 'move') {
-                    const dx = (ev.clientX - dragging.startX) / scale;
-                    const dy = (ev.clientY - dragging.startY) / scale;
-                    let newX = Math.max(0, Math.min(1024 - elem.width, elem.x + dx));
-                    let newY = Math.max(0, Math.min(576 - elem.height, elem.y + dy));
+                    const canvas = document.querySelector('.preview');
+                    const rect = canvas.getBoundingClientRect();
+                    // Calculate absolute position from mouse
+                    let newX = (ev.clientX - rect.left) / scale - dragging.offsetX;
+                    let newY = (ev.clientY - rect.top) / scale - dragging.offsetY;
+                    // Clamp to canvas bounds
+                    newX = Math.max(0, Math.min(1024 - elem.width, newX));
+                    newY = Math.max(0, Math.min(576 - elem.height, newY));
                     if (snapEnabled) {
                         newX = snapToGrid(newX);
                         newY = snapToGrid(newY);
                     }
                     updateElement(elem.id, { x: newX, y: newY });
-                    setDragging({ ...dragging, startX: ev.clientX, startY: ev.clientY });
                 } else if (dragging.type === 'resize') {
                     const canvas = document.querySelector('.preview');
                     const rect = canvas.getBoundingClientRect();
@@ -739,7 +755,7 @@
                                             onMouseDown: (ev) => handleMouseDown(ev, elem.id)
                                         },
                                             e('div', { className: 'element-label' }, elem.label),
-                                            elem.type === 'image' && elem.content && e('img', { src: elem.content }),
+                                            elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)' } }),
                                             elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: true, loop: elem.loop, playsInline: true }),
                                             elem.type === 'text' && e('div', { 
                                     className: 'element-text',
@@ -767,9 +783,9 @@
                                                     width: '100%', 
                                                     height: '100%', 
                                                     background: elem.objectColor || elem.color || '#f7931a',
-                                                    borderRadius: elem.objectShape === 'circle' ? '50%' : elem.objectShape === 'triangle' ? '0' : '0',
+                                                    borderRadius: elem.objectShape === 'circle' ? '50%' : '0',
                                                     clipPath: elem.objectShape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 'none',
-                                                    transform: 'scale(' + (elem.scaleX || 1) + ', ' + (elem.scaleY || 1) + ')'
+                                                    transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)'
                                                 }
                                             }),
                                             e('div', { className: 'resize-handle' })
@@ -853,7 +869,7 @@
                                     })
                                 ),
 
-                                (selectedElement.type !== 'hotspot' && selectedElement.type !== 'audio' && selectedElement.type !== 'timer' && selectedElement.type !== 'draggable') && e('div', { className: 'form-group' },
+                                (selectedElement.type !== 'hotspot' && selectedElement.type !== 'audio' && selectedElement.type !== 'timer' && selectedElement.type !== 'draggable' && selectedElement.type !== 'object') && e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, selectedElement.type === 'text' || selectedElement.type === 'button' ? 'Text' : 'URL or Upload'),
                                     selectedElement.type === 'text' || selectedElement.type === 'button' ?
                                         e('textarea', { className: 'form-textarea', value: selectedElement.content, onChange: (ev) => updateElement(selectedElement.id, { content: ev.target.value }) }) :
@@ -1023,6 +1039,61 @@
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Scale Y (stretch)'),
                                         e('input', { type: 'range', min: '0.2', max: '3', step: '0.1', className: 'form-input', value: selectedElement.scaleY || 1, onChange: (ev) => updateElement(selectedElement.id, { scaleY: parseFloat(ev.target.value) }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Rotation'),
+                                        e('div', { style: { display: 'flex', gap: '3px', flexWrap: 'wrap' } },
+                                            [0, 45, 90, 135, 180, 225, 270, 315].map(deg =>
+                                                e('button', { 
+                                                    key: deg,
+                                                    className: 'btn btn-small ' + ((selectedElement.rotation || 0) === deg ? 'btn-primary' : 'btn-secondary'),
+                                                    style: { padding: '3px 6px', fontSize: '0.6rem' },
+                                                    onClick: () => updateElement(selectedElement.id, { rotation: deg })
+                                                }, deg + '°')
+                                            )
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Flip'),
+                                        e('div', { style: { display: 'flex', gap: '5px' } },
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipH ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipH: !selectedElement.flipH })
+                                            }, '↔ Horizontal'),
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipV ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipV: !selectedElement.flipV })
+                                            }, '↕ Vertical')
+                                        )
+                                    )
+                                ),
+                                selectedElement.type === 'image' && e('div', null,
+                                    e('div', { className: 'section-title', style: { marginTop: '10px' } }, 'Transform'),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Rotation'),
+                                        e('div', { style: { display: 'flex', gap: '3px', flexWrap: 'wrap' } },
+                                            [0, 45, 90, 135, 180, 225, 270, 315].map(deg =>
+                                                e('button', { 
+                                                    key: deg,
+                                                    className: 'btn btn-small ' + ((selectedElement.rotation || 0) === deg ? 'btn-primary' : 'btn-secondary'),
+                                                    style: { padding: '3px 6px', fontSize: '0.6rem' },
+                                                    onClick: () => updateElement(selectedElement.id, { rotation: deg })
+                                                }, deg + '°')
+                                            )
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Flip'),
+                                        e('div', { style: { display: 'flex', gap: '5px' } },
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipH ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipH: !selectedElement.flipH })
+                                            }, '↔ Horizontal'),
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipV ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipV: !selectedElement.flipV })
+                                            }, '↕ Vertical')
+                                        )
                                     )
                                 ),
                                 e('div', { style: { display: 'flex', gap: '5px', marginTop: '10px' } },
@@ -1549,11 +1620,13 @@
                             elementsToHide.forEach(targetId => {
                                 if (!targetId) return;
                                 const elem = currentStep.elements.find(e => e.id === targetId);
-                                if (elem && elem.transition && elem.transition !== 'none') {
+                                const outTrans = elem?.transitionOut && elem.transitionOut !== 'none' ? elem.transitionOut : elem?.transition;
+                                const outDur = elem?.transitionOut && elem.transitionOut !== 'none' ? (elem.transitionOutDuration || 0.5) : (elem?.transitionDuration || 0.5);
+                                if (outTrans && outTrans !== 'none') {
                                     // Mark as hiding to show out-transition
                                     setHidingElements(prev => ({ ...prev, [targetId]: true }));
                                     // Actually hide after transition duration
-                                    const duration = (elem.transitionDuration || 0.5) * 1000;
+                                    const duration = outDur * 1000;
                                     const timer = setTimeout(() => {
                                         setVisibleElements(prev => ({ ...prev, [targetId]: false }));
                                         setHidingElements(prev => ({ ...prev, [targetId]: false }));
@@ -1689,12 +1762,15 @@
                         .sort((a, b) => a.layer - b.layer)
                         .map(elem => {
                             const isHiding = hidingElements[elem.id];
-                            const transClass = elem.transition && elem.transition !== 'none' ? 
-                                (isHiding ? 'trans-' + elem.transition + '-out' : 'trans-' + elem.transition) : 
-                                '';
+                            const outTrans = elem.transitionOut && elem.transitionOut !== 'none' ? elem.transitionOut : elem.transition;
+                            const transClass = isHiding ? 
+                                (outTrans && outTrans !== 'none' ? 'trans-' + outTrans + '-out' : '') :
+                                (elem.transition && elem.transition !== 'none' ? 'trans-' + elem.transition : '');
+                            const duringClass = !isHiding && elem.animationDuring && elem.animationDuring !== 'none' ? 'anim-' + elem.animationDuring : '';
+                            const transDur = isHiding ? (elem.transitionOutDuration || elem.transitionDuration || 0.5) : (elem.transitionDuration || 0.5);
                             return e('div', {
                                 key: elem.id,
-                                className: transClass,
+                                className: (transClass + ' ' + duringClass).trim(),
                                 onMouseDown: elem.type === 'draggable' ? (ev) => handleDragStart(ev, elem) : undefined,
                                 style: {
                                     position: 'absolute',
@@ -1706,11 +1782,11 @@
                                     cursor: elem.type === 'draggable' ? (draggedItem?.id === elem.id ? 'grabbing' : 'grab') : (elem.type === 'button' || (elem.type === 'hotspot' && elem.hotspotMode !== 'drop')) ? 'pointer' : 'default',
                                     borderRadius: elem.shape === 'circle' ? '50%' : '0',
                                     opacity: draggedItem?.id === elem.id ? 0.7 : 1,
-                                    animationDuration: (elem.transitionDuration || 0.5) + 's'
+                                    animationDuration: transDur + 's'
                                 },
                                 onClick: () => handleClick(elem)
                             },
-                                elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
+                                elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)' } }),
                                 elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
                                 elem.type === 'text' && e('div', { 
                                     className: 'element-text', 
@@ -1732,7 +1808,17 @@
                                         e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' } }) :
                                         e('div', { style: { fontSize: elem.fontSize + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', pointerEvents: 'none' } }, elem.content || '📦')
                                 ),
-                                elem.type === 'hotspot' && elem.showInGame && e('div', { style: { width: '100%', height: '100%', border: '3px dashed rgba(255,0,0,0.5)', background: 'rgba(255,0,0,0.05)' } })
+                                elem.type === 'hotspot' && elem.showInGame && e('div', { style: { width: '100%', height: '100%', border: '3px dashed rgba(255,0,0,0.5)', background: 'rgba(255,0,0,0.05)' } }),
+                                elem.type === 'object' && e('div', { 
+                                    style: { 
+                                        width: '100%', 
+                                        height: '100%', 
+                                        background: elem.objectColor || elem.color || '#f7931a',
+                                        borderRadius: elem.objectShape === 'circle' ? '50%' : '0',
+                                        clipPath: elem.objectShape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 'none',
+                                        transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)'
+                                    }
+                                })
                             );
                         })
                 ),
@@ -1996,15 +2082,19 @@ function createElemHTML(e, withTransition) {
     const transClass = withTransition && e.transition && e.transition !== "none" && !isHiding ? " trans-" + e.transition : (isHiding && outTrans && outTrans !== "none" ? " trans-" + outTrans + "-out" : "");
     const duringClass = e.animationDuring && e.animationDuring !== "none" && !isHiding ? " anim-" + e.animationDuring : "";
     const transDur = isHiding ? (e.transitionOutDuration || e.transitionDuration || 0.5) : (e.transitionDuration || 0.5);
-    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + (e.scaleX || 1) + "," + (e.scaleY || 1) + ")" : "";
+    const flipScaleX = e.flipH ? -1 : 1;
+    const flipScaleY = e.flipV ? -1 : 1;
+    const rotation = e.rotation || 0;
+    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg)" : "";
     const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s" + objectStyle;
     const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \\'' + e.id + '\\')" ontouchstart="handleDragStart(event, \\'' + e.id + '\\')"' : "";
     const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\\'' + e.id + '\\')"' : "";
     const hotspotClass = (e.type === "hotspot" && e.showInGame) ? " elem-hotspot-visible" : "";
     const objectClass = e.type === "object" ? " elem-object" : "";
+    const imgTransform = (e.flipH || e.flipV || rotation) ? "transform:scale(" + flipScaleX + "," + flipScaleY + ") rotate(" + rotation + "deg);" : "";
     
     let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + objectClass + transClass + duringClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
-    if (e.type === "image" && e.content) h += '<img src="' + e.content + '">';
+    if (e.type === "image" && e.content) h += '<img src="' + e.content + '" style="' + imgTransform + '">';
     if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></video>';
     if (e.type === "text") h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + (e.textBgColor || "rgba(0,0,0,0.8)") + '">' + e.content + '</div>';
     if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px">' + (e.content || "Button") + '</div>';
