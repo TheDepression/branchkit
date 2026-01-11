@@ -1531,24 +1531,6 @@
                 
                 setEventTimers(newTimers);
 
-                setTimeout(() => {
-                    const videos = document.querySelectorAll('video');
-                    videos.forEach(video => {
-                        const elem = currentStep.elements.find(e => e.content && video.src.includes(e.content));
-                        if (elem) {
-                            video.onended = () => {
-                                currentStep.events.forEach(event => {
-                                    if (event.trigger.type === 'afterElement' && event.trigger.sourceElement === elem.id) {
-                                        if (checkCondition(event.condition)) {
-                                            processActions(event.actions);
-                                        }
-                                    }
-                                });
-                            };
-                        }
-                    });
-                }, 100);
-
                 return () => {
                     newTimers.forEach(timer => clearTimeout(timer));
                 };
@@ -1699,6 +1681,17 @@
                 });
             };
 
+            const handleVideoEnd = (elem) => {
+                if (!currentStep) return;
+                currentStep.events.forEach(event => {
+                    if (event.trigger.type === 'afterElement' && event.trigger.sourceElement === elem.id) {
+                        if (checkCondition(event.condition)) {
+                            processActions(event.actions);
+                        }
+                    }
+                });
+            };
+
             const handleClick = (elem) => {
                 if (!currentStep) return;
                 if (elem.type === 'hotspot' && (elem.hotspotMode === 'drop')) return;
@@ -1822,7 +1815,14 @@
                                 onClick: () => handleClick(elem)
                             },
                                 elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)' } }),
-                                elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
+                                elem.type === 'video' && elem.content && e('video', { 
+                                    src: elem.content, 
+                                    autoPlay: elem.autoplay, 
+                                    loop: elem.loop, 
+                                    playsInline: true, 
+                                    onEnded: () => !elem.loop && handleVideoEnd(elem),
+                                    style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } 
+                                }),
                                 elem.type === 'text' && e('div', { 
                                     className: 'element-text', 
                                     style: { 
@@ -1836,7 +1836,7 @@
                                     } 
                                 }, elem.content),
                                 elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color, color: elem.buttonTextColor || '#ffffff', fontSize: (elem.buttonTextSize || 20) + 'px' } }, elem.content || 'Button'),
-                                elem.type === 'audio' && elem.content && e('audio', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop }),
+                                elem.type === 'audio' && elem.content && e('audio', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, onEnded: () => !elem.loop && handleVideoEnd(elem) }),
                                 elem.type === 'timer' && e('div', { className: 'element-timer' }, activeTimers[elem.id] !== undefined ? activeTimers[elem.id] : elem.countdown),
                                 elem.type === 'draggable' && (
                                     elem.contentType === 'image' && elem.content ? 
@@ -2026,20 +2026,6 @@ function render() {
     });
     
     fullDraw();
-    
-    setTimeout(() => {
-        const vids = document.querySelectorAll("video");
-        vids.forEach(v => {
-            const elem = s.elements.find(e => e.content && v.src.includes(e.content));
-            if (elem) {
-                v.onended = () => {
-                    s.events.forEach(ev => {
-                        if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === elem.id && checkCond(ev.condition)) exec(ev.actions);
-                    });
-                };
-            }
-        });
-    }, 100);
 }
 
 function startTimer(id, countdown) {
@@ -2164,10 +2150,10 @@ function createElemHTML(e, withTransition) {
     
     let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + objectClass + transClass + duringClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
     if (e.type === "image" && e.content) h += '<img src="' + e.content + '" style="' + imgTransform + '">';
-    if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></video>';
+    if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\\'' + e.id + '\\')" data-video-id="' + e.id + '"><source src="' + e.content + '"></video>';
     if (e.type === "text") h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + (e.textBgColor || "rgba(0,0,0,0.8)") + '">' + e.content + '</div>';
     if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px">' + (e.content || "Button") + '</div>';
-    if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></audio>';
+    if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\\'' + e.id + '\\')"><source src="' + e.content + '"></audio>';
     if (e.type === "timer") h += '<div class="elem-timer">' + (timerCountdowns[e.id] !== undefined ? timerCountdowns[e.id] : e.countdown) + '</div>';
     if (e.type === "draggable") {
         if (e.contentType === "image" && e.content) h += '<img src="' + e.content + '">';
@@ -2322,6 +2308,13 @@ function handleDragEnd(ev) {
         draggedDiv.style.top = draggedElem.y + 'px';
     }
     draggedElem = null;
+}
+
+function handleVideoEnd(id) {
+    const s = STEPS.find(x => x.id === current);
+    s.events.forEach(ev => {
+        if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === id && checkCond(ev.condition)) exec(ev.actions);
+    });
 }
 
 function handleClick(id) {
