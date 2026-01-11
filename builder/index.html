@@ -34,7 +34,7 @@
         .element:hover { border-color: #f7931a; }
         .element.selected { border-color: #10b981; border-style: solid; }
         .element img, .element video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-        .element-text { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 6px; color: white; font-size: 1.5rem; text-align: center; word-wrap: break-word; overflow: hidden; }
+        .element-text { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 6px; color: white; font-size: 1.5rem; text-align: center; word-wrap: break-word; overflow: hidden; white-space: pre-wrap; }
         .element-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .element-hotspot { border: 2px solid red; background: rgba(255,0,0,0.1); }
         .element-audio { background: rgba(0,100,200,0.3); border: 2px dashed #00aaff; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
@@ -98,6 +98,18 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0a0e27; }
         ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
+        .collapsible-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 4px; background: #1a1f3a; border-radius: 3px; margin-bottom: 3px; }
+        .collapsible-header:hover { background: #252b45; }
+        .collapsible-arrow { transition: transform 0.2s; font-size: 10px; }
+        .collapsible-arrow.open { transform: rotate(90deg); }
+        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .collapsible-content.open { max-height: 500px; overflow-y: auto; }
+        .element-list-item { padding: 5px 8px; background: #1a1f3a; border: 1px solid #2d3748; border-radius: 3px; margin-bottom: 3px; cursor: pointer; font-size: 0.7rem; display: flex; justify-content: space-between; align-items: center; }
+        .element-list-item:hover { border-color: #f7931a; background: #1f2541; }
+        .element-list-item.selected { border-color: #10b981; background: #1a3a2e; }
+        .element-type-badge { font-size: 0.55rem; padding: 2px 5px; border-radius: 3px; background: #2d3748; color: #9ca3af; }
+        .btn-add-event { background: #10b981 !important; color: #fff !important; }
+        .btn-add-action { background: #f59e0b !important; color: #000 !important; }
     </style>
 </head>
 <body>
@@ -171,6 +183,8 @@
             const [currentStepId, setCurrentStepId] = useState(null);
             const [selectedElementId, setSelectedElementId] = useState(null);
             const [activeTab, setActiveTab] = useState('elements');
+            const [collapsedActions, setCollapsedActions] = useState({});
+            const [varyingItems, setVaryingItems] = useState([]);
             const [dragging, setDragging] = useState(null);
             const [playMode, setPlayMode] = useState(false);
             const [playStartStep, setPlayStartStep] = useState(null);
@@ -320,6 +334,21 @@
                 setInventory(inventory.filter(i => i.name !== item.name));
             };
 
+            const addVaryingItem = () => {
+                const name = prompt('Varying item name (e.g., dollars, points, friends):');
+                if (name && !varyingItems.find(i => i.name === name)) {
+                    setVaryingItems([...varyingItems, { name: name, visible: true }]);
+                }
+            };
+
+            const deleteVaryingItem = (item) => {
+                setVaryingItems(varyingItems.filter(i => i.name !== item.name));
+            };
+
+            const toggleActionCollapse = (actionKey) => {
+                setCollapsedActions(prev => ({ ...prev, [actionKey]: !prev[actionKey] }));
+            };
+
             const addEvent = () => {
                 const step = getCurrentStep();
                 if (step) {
@@ -418,7 +447,7 @@
             }, [dragging, scale]);
 
             const saveProject = () => {
-                const data = JSON.stringify({ steps, inventory }, null, 2);
+                const data = JSON.stringify({ steps, inventory, varyingItems }, null, 2);
                 const blob = new Blob([data], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -439,6 +468,7 @@
                             const data = JSON.parse(e.target.result);
                             setSteps(data.steps);
                             setInventory(data.inventory || []);
+                            setVaryingItems(data.varyingItems || []);
                             setCurrentStepId(data.steps[0]?.id);
                             alert('Loaded!');
                         } catch (err) {
@@ -451,7 +481,7 @@
             };
 
             const exportHTML = () => {
-                const html = generateHTML(steps, inventory);
+                const html = generateHTML(steps, inventory, varyingItems);
                 navigator.clipboard.writeText(html).then(() => {
                     alert('✅ HTML copied!');
                 }).catch(() => {
@@ -466,7 +496,7 @@
             };
 
             if (playMode) {
-                return e(PlayMode, { steps, inventory, onExit: () => setPlayMode(false), startStepId: playStartStep || currentStepId });
+                return e(PlayMode, { steps, inventory, varyingItems, onExit: () => setPlayMode(false), startStepId: playStartStep || currentStepId });
             }
 
             const currentStep = getCurrentStep();
@@ -796,7 +826,7 @@
                                     ),
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Background Opacity'),
-                                        e('input', { type: 'range', min: '0', max: '1', step: '0.1', className: 'form-input', value: selectedElement.textBgOpacity || 0.8, onChange: (ev) => updateElement(selectedElement.id, { textBgOpacity: parseFloat(ev.target.value) }) })
+                                        e('input', { type: 'range', min: '0', max: '1', step: '0.05', className: 'form-input', value: selectedElement.textBgOpacity !== undefined ? selectedElement.textBgOpacity : 0.8, onChange: (ev) => updateElement(selectedElement.id, { textBgOpacity: parseFloat(ev.target.value) }) })
                                     )
                                 ),
                                 (selectedElement.type === 'audio' || selectedElement.type === 'video') && e('div', { className: 'form-group' },
@@ -813,6 +843,22 @@
                                     )
                                 ),
                                 e('button', { className: 'btn btn-danger btn-small', style: { width: '100%' }, onClick: () => deleteElement(selectedElement.id) }, 'Delete')
+                            ),
+
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'All Elements'),
+                            e('div', { style: { maxHeight: '200px', overflowY: 'auto' } },
+                                currentStep.elements.length === 0 ? 
+                                    e('div', { style: { fontSize: '0.7rem', color: '#6b7280', padding: '10px', textAlign: 'center' } }, 'No elements yet') :
+                                    currentStep.elements.map(el =>
+                                        e('div', { 
+                                            key: el.id, 
+                                            className: 'element-list-item' + (selectedElementId === el.id ? ' selected' : ''),
+                                            onClick: () => setSelectedElementId(el.id)
+                                        },
+                                            e('span', null, el.label),
+                                            e('span', { className: 'element-type-badge' }, el.type)
+                                        )
+                                    )
                             )
                         ),
 
@@ -847,12 +893,35 @@
                                         ),
                                         e('select', { className: 'form-select', value: event.condition.type, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, type: ev.target.value } }), style: { marginBottom: '3px', fontSize: '0.6rem' } },
                                             e('option', { value: 'hasItem' }, 'Has Item'),
-                                            e('option', { value: 'notHasItem' }, 'Does NOT Have Item')
+                                            e('option', { value: 'notHasItem' }, 'Does NOT Have Item'),
+                                            e('option', { value: 'varyingAtLeast' }, '📊 Has At Least'),
+                                            e('option', { value: 'varyingAtMost' }, '📊 Has At Most'),
+                                            e('option', { value: 'varyingBetween' }, '📊 Has Between')
                                         ),
-                                        e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }) },
-                                            e('option', { value: '' }, '-- Item --'),
-                                            inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
-                                        )
+                                        (event.condition.type === 'hasItem' || event.condition.type === 'notHasItem') ?
+                                            e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }) },
+                                                e('option', { value: '' }, '-- Item --'),
+                                                inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
+                                            ) :
+                                        (event.condition.type === 'varyingAtLeast' || event.condition.type === 'varyingAtMost') ?
+                                            e('div', null,
+                                                e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }), style: { marginBottom: '3px' } },
+                                                    e('option', { value: '' }, '-- Varying Item --'),
+                                                    varyingItems.map(item => e('option', { key: item.name, value: item.name }, item.name))
+                                                ),
+                                                e('input', { type: 'number', className: 'form-input', placeholder: 'Amount', value: event.condition.amount || 0, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, amount: parseFloat(ev.target.value) || 0 } }) })
+                                            ) :
+                                        event.condition.type === 'varyingBetween' ?
+                                            e('div', null,
+                                                e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }), style: { marginBottom: '3px' } },
+                                                    e('option', { value: '' }, '-- Varying Item --'),
+                                                    varyingItems.map(item => e('option', { key: item.name, value: item.name }, item.name))
+                                                ),
+                                                e('div', { style: { display: 'flex', gap: '5px' } },
+                                                    e('input', { type: 'number', className: 'form-input', placeholder: 'Min', value: event.condition.min || 0, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, min: parseFloat(ev.target.value) || 0 } }) }),
+                                                    e('input', { type: 'number', className: 'form-input', placeholder: 'Max', value: event.condition.max || 0, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, max: parseFloat(ev.target.value) || 0 } }) })
+                                                )
+                                            ) : null
                                     ),
                                     !event.condition && e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '5px' }, onClick: () => updateEvent(event.id, { condition: { type: 'hasItem', item: '' } }) }, '+ Add Condition'),
                                     
@@ -865,7 +934,9 @@
                                                 e('option', { value: 'hideDelay' }, 'Hide (Delayed)'),
                                                 e('option', { value: 'goto' }, 'Go To Step'),
                                                 e('option', { value: 'addItem' }, 'Add Inventory'),
-                                                e('option', { value: 'removeItem' }, 'Remove Inventory')
+                                                e('option', { value: 'removeItem' }, 'Remove Inventory'),
+                                                e('option', { value: 'addVarying' }, '📊 Add to Varying'),
+                                                e('option', { value: 'subtractVarying' }, '📊 Subtract from Varying')
                                             ),
                                             action.type === 'goto' ?
                                                 e('div', null,
@@ -895,30 +966,51 @@
                                                     e('option', { value: '' }, '-- Item --'),
                                                     inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
                                                 ) :
+                                            action.type === 'addVarying' || action.type === 'subtractVarying' ?
+                                                e('div', null,
+                                                    e('select', { className: 'form-select', value: action.target, onChange: (ev) => updateEventAction(event.id, action.id, { target: ev.target.value }), style: { marginBottom: '5px' } },
+                                                        e('option', { value: '' }, '-- Varying Item --'),
+                                                        varyingItems.map(item => e('option', { key: item.name, value: item.name }, item.name))
+                                                    ),
+                                                    e('div', { className: 'form-group', style: { marginBottom: '0' } },
+                                                        e('label', { className: 'form-label' }, 'Amount'),
+                                                        e('input', { type: 'number', className: 'form-input', value: action.amount || 0, onChange: (ev) => updateEventAction(event.id, action.id, { amount: parseFloat(ev.target.value) || 0 }) })
+                                                    )
+                                                ) :
                                             (action.type === 'show' || action.type === 'hide' || action.type === 'showDelay' || action.type === 'hideDelay') ?
                                                 e('div', null,
                                                     (action.type === 'showDelay' || action.type === 'hideDelay') && e('div', { className: 'form-group', style: { marginBottom: '5px' } },
                                                         e('label', { className: 'form-label' }, 'Delay (seconds)'),
                                                         e('input', { type: 'number', step: '0.1', className: 'form-input', value: action.delay || 0, onChange: (ev) => updateEventAction(event.id, action.id, { delay: parseFloat(ev.target.value) || 0 }) })
                                                     ),
-                                                    e('div', { style: { fontSize: '0.6rem', color: '#10b981', marginBottom: '3px' } }, 'Select multiple:'),
-                                                    currentStep.elements.map(el =>
-                                                        e('label', { key: el.id, style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', marginBottom: '2px', cursor: 'pointer' } },
-                                                            e('input', { 
-                                                                type: 'checkbox', 
-                                                                className: 'form-checkbox',
-                                                                checked: action.targets ? action.targets.includes(el.id) : action.target === el.id,
-                                                                onChange: (ev) => {
-                                                                    if (ev.target.checked) {
-                                                                        const newTargets = action.targets ? [...action.targets, el.id] : [action.target, el.id].filter(Boolean);
-                                                                        updateEventAction(event.id, action.id, { targets: newTargets, target: '' });
-                                                                    } else {
-                                                                        const newTargets = action.targets ? action.targets.filter(t => t !== el.id) : [];
-                                                                        updateEventAction(event.id, action.id, { targets: newTargets.length > 0 ? newTargets : undefined, target: newTargets.length === 0 ? '' : action.target });
+                                                    e('div', { 
+                                                        className: 'collapsible-header', 
+                                                        onClick: () => toggleActionCollapse(event.id + '_' + action.id)
+                                                    },
+                                                        e('span', { style: { fontSize: '0.6rem', color: '#10b981' } }, 
+                                                            'Elements (' + (action.targets ? action.targets.length : (action.target ? 1 : 0)) + ' selected)'
+                                                        ),
+                                                        e('span', { className: 'collapsible-arrow' + (collapsedActions[event.id + '_' + action.id] === false || collapsedActions[event.id + '_' + action.id] === undefined ? '' : ' open') }, '▶')
+                                                    ),
+                                                    e('div', { className: 'collapsible-content' + (collapsedActions[event.id + '_' + action.id] ? ' open' : '') },
+                                                        currentStep.elements.map(el =>
+                                                            e('label', { key: el.id, style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', marginBottom: '2px', cursor: 'pointer' } },
+                                                                e('input', { 
+                                                                    type: 'checkbox', 
+                                                                    className: 'form-checkbox',
+                                                                    checked: action.targets ? action.targets.includes(el.id) : action.target === el.id,
+                                                                    onChange: (ev) => {
+                                                                        if (ev.target.checked) {
+                                                                            const newTargets = action.targets ? [...action.targets, el.id] : [action.target, el.id].filter(Boolean);
+                                                                            updateEventAction(event.id, action.id, { targets: newTargets, target: '' });
+                                                                        } else {
+                                                                            const newTargets = action.targets ? action.targets.filter(t => t !== el.id) : [];
+                                                                            updateEventAction(event.id, action.id, { targets: newTargets.length > 0 ? newTargets : undefined, target: newTargets.length === 0 ? '' : action.target });
+                                                                        }
                                                                     }
-                                                                }
-                                                            }),
-                                                            el.label
+                                                                }),
+                                                                el.label
+                                                            )
                                                         )
                                                     )
                                                 ) :
@@ -929,10 +1021,10 @@
                                             e('button', { className: 'btn btn-danger btn-small', onClick: () => deleteEventAction(event.id, action.id), style: { marginTop: '3px', width: '100%' } }, 'Remove')
                                         )
                                     ),
-                                    e('button', { className: 'add-btn', onClick: () => addEventAction(event.id) }, '+ Action')
+                                    e('button', { className: 'add-btn btn-add-action', onClick: () => addEventAction(event.id) }, '+ Action')
                                 )
                             ),
-                            e('button', { className: 'add-btn', onClick: addEvent }, '+ Event')
+                            e('button', { className: 'add-btn btn-add-event', onClick: addEvent }, '+ Event')
                         ),
 
                         activeTab === 'inventory' && e('div', null,
@@ -958,7 +1050,28 @@
                                     e('button', { className: 'btn btn-danger btn-small', onClick: () => deleteInventoryItem(item) }, '×')
                                 )
                             ),
-                            e('button', { className: 'add-btn', onClick: addInventoryItem }, '+ Item')
+                            e('button', { className: 'add-btn', onClick: addInventoryItem }, '+ Item'),
+
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'Varying Items'),
+                            e('div', { className: 'info-box' }, 'Items with numeric values (money, points, etc). Use actions to add/subtract.'),
+                            varyingItems.map(item =>
+                                e('div', { key: item.name, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px', background: '#1a1f3a', marginBottom: '4px', borderRadius: '4px', border: '1px solid #f59e0b' } },
+                                    e('span', { style: { fontSize: '0.75rem', flex: 1, color: '#f59e0b' } }, '📊 ' + item.name),
+                                    e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.6rem', marginRight: '8px', cursor: 'pointer' } },
+                                        e('input', { 
+                                            type: 'checkbox', 
+                                            className: 'form-checkbox',
+                                            checked: item.visible,
+                                            onChange: (ev) => {
+                                                setVaryingItems(varyingItems.map(i => i.name === item.name ? { ...i, visible: ev.target.checked } : i));
+                                            }
+                                        }),
+                                        'Visible'
+                                    ),
+                                    e('button', { className: 'btn btn-danger btn-small', onClick: () => deleteVaryingItem(item) }, '×')
+                                )
+                            ),
+                            e('button', { className: 'add-btn', onClick: addVaryingItem }, '+ Varying Item')
                         ),
 
                         activeTab === 'settings' && e('div', null,
@@ -1005,10 +1118,11 @@
             );
         }
 
-        function PlayMode({ steps, inventory, onExit, startStepId }) {
+        function PlayMode({ steps, inventory, varyingItems, onExit, startStepId }) {
             const [currentStepId, setCurrentStepId] = useState(startStepId || steps[0]?.id);
             const [visibleElements, setVisibleElements] = useState({});
             const [playerInventory, setPlayerInventory] = useState([]);
+            const [playerVaryingValues, setPlayerVaryingValues] = useState({});
             const [activeTimers, setActiveTimers] = useState({});
             const [eventTimers, setEventTimers] = useState([]);
             const [draggedItem, setDraggedItem] = useState(null);
@@ -1123,6 +1237,13 @@
                     return playerInventory.includes(condition.item);
                 } else if (condition.type === 'notHasItem') {
                     return !playerInventory.includes(condition.item);
+                } else if (condition.type === 'varyingAtLeast') {
+                    return (playerVaryingValues[condition.item] || 0) >= (condition.amount || 0);
+                } else if (condition.type === 'varyingAtMost') {
+                    return (playerVaryingValues[condition.item] || 0) <= (condition.amount || 0);
+                } else if (condition.type === 'varyingBetween') {
+                    const val = playerVaryingValues[condition.item] || 0;
+                    return val >= (condition.min || 0) && val <= (condition.max || 0);
                 }
                 return true;
             };
@@ -1245,6 +1366,10 @@
                         setPlayerInventory(prev => prev.includes(action.target) ? prev : [...prev, action.target]);
                     } else if (action.type === 'removeItem') {
                         setPlayerInventory(prev => prev.filter(item => item !== action.target));
+                    } else if (action.type === 'addVarying') {
+                        setPlayerVaryingValues(prev => ({ ...prev, [action.target]: (prev[action.target] || 0) + (action.amount || 0) }));
+                    } else if (action.type === 'subtractVarying') {
+                        setPlayerVaryingValues(prev => ({ ...prev, [action.target]: (prev[action.target] || 0) - (action.amount || 0) }));
                     }
                 });
             };
@@ -1406,7 +1531,7 @@
             );
         }
 
-        function generateHTML(steps, inventory) {
+        function generateHTML(steps, inventory, varyingItems) {
             return `<!DOCTYPE html>
 <html>
 <head>
@@ -1421,7 +1546,7 @@
         .elem video { pointer-events: none; }
         .elem video::-webkit-media-controls { display: none !important; }
         .elem video::-webkit-media-controls-enclosure { display: none !important; }
-        .elem-text { padding: 15px; border-radius: 6px; text-align: center; }
+        .elem-text { padding: 15px; border-radius: 6px; text-align: center; white-space: pre-wrap; }
         .elem-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .elem-timer { background: rgba(247,147,26,0.8); color: #fff; font-size: 3rem; font-weight: 900; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-family: monospace; }
         .elem-draggable { cursor: grab; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: none; }
@@ -1461,9 +1586,11 @@
     <script>
 const STEPS = ${JSON.stringify(steps)};
 const INVENTORY_ITEMS = ${JSON.stringify(inventory)};
+const VARYING_ITEMS = ${JSON.stringify(varyingItems || [])};
 let current = STEPS[0].id;
 let visible = {};
 let inventory = [];
+let varyingValues = {};
 let timers = [];
 let timerCountdowns = {};
 let hiding = {};
@@ -1599,6 +1726,9 @@ function checkCond(c) {
     if (!c) return true;
     if (c.type === "hasItem") return inventory.includes(c.item);
     if (c.type === "notHasItem") return !inventory.includes(c.item);
+    if (c.type === "varyingAtLeast") return (varyingValues[c.item] || 0) >= (c.amount || 0);
+    if (c.type === "varyingAtMost") return (varyingValues[c.item] || 0) <= (c.amount || 0);
+    if (c.type === "varyingBetween") return (varyingValues[c.item] || 0) >= (c.min || 0) && (varyingValues[c.item] || 0) <= (c.max || 0);
     return true;
 }
 
@@ -1619,6 +1749,8 @@ function exec(acts) {
             return;
         } else if (a.type === "addItem" && !inventory.includes(a.target)) inventory.push(a.target);
         else if (a.type === "removeItem") inventory = inventory.filter(x => x !== a.target);
+        else if (a.type === "addVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) + (a.amount || 0);
+        else if (a.type === "subtractVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) - (a.amount || 0);
     });
     updateInventory();
 }
