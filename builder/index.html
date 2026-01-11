@@ -198,7 +198,9 @@
                 scaleY: 1,
                 rotation: 0,
                 flipH: false,
-                flipV: false
+                flipV: false,
+                opacity: 100,
+                textBgOpacity: 80
             };
         }
 
@@ -790,7 +792,7 @@
                                             onMouseDown: (ev) => handleMouseDown(ev, elem.id)
                                         },
                                             e('div', { className: 'element-label' }, elem.label),
-                                            elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)' } }),
+                                            elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)', opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100 } }),
                                             elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: true, loop: elem.loop, playsInline: true }),
                                             elem.type === 'text' && e('div', { 
                                     className: 'element-text',
@@ -820,7 +822,8 @@
                                                     background: elem.objectColor || elem.color || '#f7931a',
                                                     borderRadius: elem.objectShape === 'circle' ? '50%' : '0',
                                                     clipPath: elem.objectShape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 'none',
-                                                    transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)'
+                                                    transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)',
+                                                    opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100
                                                 }
                                             }),
                                             e('div', { className: 'resize-handle' })
@@ -1037,8 +1040,8 @@
                                         e('input', { type: 'color', className: 'form-input', value: selectedElement.textBgColor ? selectedElement.textBgColor.replace('rgba(0,0,0,0.8)', '#000000') : '#000000', onChange: (ev) => updateElement(selectedElement.id, { textBgColor: ev.target.value }) })
                                     ),
                                     e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, 'Background Opacity'),
-                                        e('input', { type: 'range', min: '0', max: '1', step: '0.05', className: 'form-input', value: selectedElement.textBgOpacity !== undefined ? selectedElement.textBgOpacity : 0.8, onChange: (ev) => updateElement(selectedElement.id, { textBgOpacity: parseFloat(ev.target.value) }) })
+                                        e('label', { className: 'form-label' }, 'Background Opacity (0-100)'),
+                                        e('input', { type: 'number', min: '0', max: '100', className: 'form-input', value: selectedElement.textBgOpacity !== undefined ? Math.round(selectedElement.textBgOpacity * 100) : 80, onChange: (ev) => updateElement(selectedElement.id, { textBgOpacity: Math.max(0, Math.min(100, parseInt(ev.target.value) || 0)) / 100 }) })
                                     )
                                 ),
                                 (selectedElement.type === 'audio' || selectedElement.type === 'video') && e('div', { className: 'form-group' },
@@ -1066,6 +1069,10 @@
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Object Color'),
                                         e('input', { type: 'color', className: 'form-input', value: selectedElement.objectColor || '#f7931a', onChange: (ev) => updateElement(selectedElement.id, { objectColor: ev.target.value }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Opacity (0-100)'),
+                                        e('input', { type: 'number', min: '0', max: '100', className: 'form-input', value: selectedElement.opacity !== undefined ? selectedElement.opacity : 100, onChange: (ev) => updateElement(selectedElement.id, { opacity: Math.max(0, Math.min(100, parseInt(ev.target.value) || 0)) }) })
                                     ),
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Scale X (stretch)'),
@@ -1104,6 +1111,10 @@
                                 ),
                                 selectedElement.type === 'image' && e('div', null,
                                     e('div', { className: 'section-title', style: { marginTop: '10px' } }, 'Transform'),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Opacity (0-100)'),
+                                        e('input', { type: 'number', min: '0', max: '100', className: 'form-input', value: selectedElement.opacity !== undefined ? selectedElement.opacity : 100, onChange: (ev) => updateElement(selectedElement.id, { opacity: Math.max(0, Math.min(100, parseInt(ev.target.value) || 0)) }) })
+                                    ),
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Rotation'),
                                         e('div', { style: { display: 'flex', gap: '3px', flexWrap: 'wrap' } },
@@ -1814,7 +1825,7 @@
                                 },
                                 onClick: () => handleClick(elem)
                             },
-                                elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)' } }),
+                                elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)', opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100 } }),
                                 elem.type === 'video' && elem.content && e('video', { 
                                     src: elem.content, 
                                     autoPlay: elem.autoplay, 
@@ -1851,7 +1862,8 @@
                                         background: elem.objectColor || elem.color || '#f7931a',
                                         borderRadius: elem.objectShape === 'circle' ? '50%' : '0',
                                         clipPath: elem.objectShape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 'none',
-                                        transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)'
+                                        transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)',
+                                        opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100
                                     }
                                 })
                             );
@@ -2131,6 +2143,15 @@ function exec(acts) {
     updateInventory();
 }
 
+function hexToRgba(hex, opacity) {
+    if (!hex || hex.startsWith('rgba')) return hex || 'rgba(0,0,0,' + opacity + ')';
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + opacity + ')';
+}
+
 function createElemHTML(e, withTransition) {
     const isHiding = hiding[e.id];
     const outTrans = e.transitionOut && e.transitionOut !== "none" ? e.transitionOut : e.transition;
@@ -2140,7 +2161,8 @@ function createElemHTML(e, withTransition) {
     const flipScaleX = e.flipH ? -1 : 1;
     const flipScaleY = e.flipV ? -1 : 1;
     const rotation = e.rotation || 0;
-    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg)" : "";
+    const objectOpacity = (e.opacity !== undefined ? e.opacity : 100) / 100;
+    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg);opacity:" + objectOpacity : "";
     const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s" + objectStyle;
     const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \\'' + e.id + '\\')" ontouchstart="handleDragStart(event, \\'' + e.id + '\\')"' : "";
     const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\\'' + e.id + '\\')"' : "";
@@ -2149,9 +2171,13 @@ function createElemHTML(e, withTransition) {
     const imgTransform = (e.flipH || e.flipV || rotation) ? "transform:scale(" + flipScaleX + "," + flipScaleY + ") rotate(" + rotation + "deg);" : "";
     
     let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + objectClass + transClass + duringClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
-    if (e.type === "image" && e.content) h += '<img src="' + e.content + '" style="' + imgTransform + '">';
+    if (e.type === "image" && e.content) h += '<img src="' + e.content + '" style="' + imgTransform + 'opacity:' + ((e.opacity !== undefined ? e.opacity : 100) / 100) + ';">';
     if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\\'' + e.id + '\\')" data-video-id="' + e.id + '"><source src="' + e.content + '"></video>';
-    if (e.type === "text") h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + (e.textBgColor || "rgba(0,0,0,0.8)") + '">' + e.content + '</div>';
+    if (e.type === "text") {
+        const bgOpacity = e.textBgOpacity !== undefined ? e.textBgOpacity : 0.8;
+        const bgColor = hexToRgba(e.textBgColor || '#000000', bgOpacity);
+        h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + bgColor + '">' + e.content + '</div>';
+    }
     if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px">' + (e.content || "Button") + '</div>';
     if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\\'' + e.id + '\\')"><source src="' + e.content + '"></audio>';
     if (e.type === "timer") h += '<div class="elem-timer">' + (timerCountdowns[e.id] !== undefined ? timerCountdowns[e.id] : e.countdown) + '</div>';
