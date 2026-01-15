@@ -1983,9 +1983,13 @@
     <div id="inventory" class="inventory-display" style="display:none"></div>
     <div id="varying" style="position:fixed;top:20px;left:20px;background:rgba(0,0,0,0.8);padding:10px;border-radius:8px;display:none;flex-direction:column;gap:5px;z-index:100"></div>
     <script>
-const STEPS = ${JSON.stringify(steps)};
-const INVENTORY_ITEMS = ${JSON.stringify(inventory)};
-const VARYING_ITEMS = ${JSON.stringify(varyingItems || [])};
+// Story data - properly formatted with indentation for readability
+const STORY_DATA = ${JSON.stringify({ steps, inventoryItems: inventory, varyingItems: varyingItems || [] }, null, 2)};
+
+const STEPS = STORY_DATA.steps;
+const INVENTORY_ITEMS = STORY_DATA.inventoryItems;
+const VARYING_ITEMS = STORY_DATA.varyingItems;
+
 let current = STEPS[0].id;
 let visible = {};
 let inventory = [];
