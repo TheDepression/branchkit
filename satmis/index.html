@@ -9,14 +9,7 @@
         .canvas { width: 1024px; height: 576px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1); transform-origin: center; }
         @media (max-width: 1024px), (max-height: 576px) {
     .canvas { 
-        transform: translate(-50%, -50%) scale(calc(min(100dvw / 1024, 100dvh / 576)));
-    }
-}
-
-/* Landscape mode - prioritize height */
-@media (orientation: landscape) and (max-height: 576px) {
-    .canvas { 
-        transform: translate(-50%, -50%) scale(calc(100dvh / 576));
+        transform: translate(-50%, -50%) scale(calc(min(98dvw / 1024, 98dvh / 576)));
     }
 }
         .elem { position: absolute; }
