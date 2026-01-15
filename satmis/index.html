@@ -7,9 +7,9 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; overflow: hidden; width: 100dvw; height: 100dvh; position: fixed; }
         .canvas { width: 1024px; height: 576px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%) scale(1); transform-origin: center; }
-        @media (max-width: 1024px) or (max-height: 576px) {
+        @media (max-width: 1024px), (max-height: 576px) {
     .canvas { 
-        transform: translate(-50%, -50%) scale(calc(min(100vw / 1024, 100vh / 576)));
+        transform: translate(-50%, -50%) scale(calc(min(100dvw / 1024, 100dvh / 576)));
     }
 }
         .elem { position: absolute; }
