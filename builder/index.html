@@ -423,6 +423,37 @@
 
             const toggleActionCollapse = (actionKey) => {
                 setCollapsedActions(prev => ({ ...prev, [actionKey]: !prev[actionKey] }));
+                
+                // Auto-clean phantom targets when opening the menu
+                const [eventId, actionId] = actionKey.split('_');
+                const step = getCurrentStep();
+                if (!step) return;
+                
+                const event = step.events.find(ev => ev.id === eventId);
+                if (!event) return;
+                
+                const action = event.actions.find(a => a.id === actionId);
+                if (!action || !action.targets) return;
+                
+                // For goto actions, validate against step IDs
+                // For other actions, validate against element IDs
+                let validIds;
+                if (action.type === 'goto') {
+                    validIds = steps.map(s => s.id);
+                } else {
+                    validIds = step.elements.map(el => el.id);
+                }
+                
+                // Filter out phantom IDs (deleted elements/steps)
+                const cleanedTargets = action.targets.filter(t => validIds.includes(t));
+                
+                // If we removed phantom targets, update the action
+                if (cleanedTargets.length !== action.targets.length) {
+                    updateEventAction(eventId, actionId, { 
+                        targets: cleanedTargets.length > 0 ? cleanedTargets : undefined,
+                        target: cleanedTargets.length === 0 ? '' : action.target
+                    });
+                }
             };
 
             const toggleEventCollapse = (eventId) => {
@@ -686,6 +717,64 @@
                 input.click();
             };
 
+            const cleanPhantomReferences = () => {
+                if (!confirm('This will scan all events and remove references to deleted elements and steps. Continue?')) {
+                    return;
+                }
+                
+                let totalCleaned = 0;
+                const validStepIds = steps.map(s => s.id);
+                
+                const newSteps = steps.map(step => {
+                    const validElementIds = step.elements.map(el => el.id);
+                    const cleanedEvents = step.events.map(event => {
+                        const cleanedActions = event.actions.map(action => {
+                            if (!action.targets && !action.target) return action;
+                            
+                            // For goto actions, validate against step IDs
+                            // For other actions, validate against element IDs
+                            const validIds = action.type === 'goto' ? validStepIds : validElementIds;
+                            
+                            // Clean targets array
+                            if (action.targets) {
+                                const originalLength = action.targets.length;
+                                const cleanedTargets = action.targets.filter(t => validIds.includes(t));
+                                totalCleaned += originalLength - cleanedTargets.length;
+                                
+                                return {
+                                    ...action,
+                                    targets: cleanedTargets.length > 0 ? cleanedTargets : undefined,
+                                    target: cleanedTargets.length === 0 ? '' : action.target
+                                };
+                            }
+                            
+                            // Clean single target
+                            if (action.target && !validIds.includes(action.target)) {
+                                totalCleaned += 1;
+                                return { ...action, target: '' };
+                            }
+                            
+                            return action;
+                        });
+                        
+                        // Also clean trigger sourceElement if it's invalid
+                        let cleanedTrigger = event.trigger;
+                        if (event.trigger.sourceElement && !validElementIds.includes(event.trigger.sourceElement)) {
+                            totalCleaned += 1;
+                            cleanedTrigger = { ...event.trigger, sourceElement: '' };
+                        }
+                        
+                        return { ...event, actions: cleanedActions, trigger: cleanedTrigger };
+                    });
+                    
+                    return { ...step, events: cleanedEvents };
+                });
+                
+                setSteps(newSteps);
+                alert(`✅ Cleaned ${totalCleaned} phantom reference(s)!`);
+            };
+
+
             const exportHTML = () => {
                 const html = generateHTML(steps, inventory, varyingItems, exportOptions);
                 navigator.clipboard.writeText(html).then(() => {
@@ -748,6 +837,7 @@
                         e('button', { className: 'btn btn-primary', onClick: () => { setPlayStartStep(steps[0]?.id); setPlayMode(true); }, title: 'Test All Steps' }, '▶ All'),
                         e('button', { className: 'btn btn-primary', onClick: () => { setPlayStartStep(currentStepId); setPlayMode(true); }, title: 'Preview Current Step', style: { background: '#10b981' } }, '▶ Step'),
                         e('button', { className: 'btn btn-danger', onClick: newProject, title: 'New Project' }, '🗑️'),
+                        e('button', { className: 'btn btn-secondary', onClick: cleanPhantomReferences, title: 'Clean Phantom References', style: { fontSize: '10px' } }, '🧹'),
                         e('button', { className: 'btn btn-secondary', onClick: saveProject, title: 'Save to File' }, '💾'),
                         e('button', { className: 'btn btn-secondary', onClick: loadProject, title: 'Load from File' }, '📂'),
                         e('button', { className: 'btn btn-success', onClick: exportHTML, title: 'Export HTML' }, '⚡')
@@ -1358,11 +1448,17 @@
                                                                 className: 'form-checkbox',
                                                                 checked: action.targets ? action.targets.includes(s.id) : action.target === s.id,
                                                                 onChange: (ev) => {
+                                                                    // Clean phantom step references (deleted steps)
+                                                                    const validStepIds = steps.map(step => step.id);
+                                                                    const existingTargets = action.targets ? action.targets.filter(t => validStepIds.includes(t)) : (action.target && validStepIds.includes(action.target) ? [action.target] : []);
+                                                                    
                                                                     if (ev.target.checked) {
-                                                                        const newTargets = action.targets ? [...action.targets, s.id] : [action.target, s.id].filter(Boolean);
+                                                                        // Add this step
+                                                                        const newTargets = [...existingTargets, s.id];
                                                                         updateEventAction(event.id, action.id, { targets: newTargets, target: '' });
                                                                     } else {
-                                                                        const newTargets = action.targets ? action.targets.filter(t => t !== s.id) : [];
+                                                                        // Remove this step
+                                                                        const newTargets = existingTargets.filter(t => t !== s.id);
                                                                         updateEventAction(event.id, action.id, { targets: newTargets.length > 0 ? newTargets : undefined, target: newTargets.length === 0 ? '' : action.target });
                                                                     }
                                                                 }
@@ -1398,7 +1494,19 @@
                                                         onClick: () => toggleActionCollapse(event.id + '_' + action.id)
                                                     },
                                                         e('span', { style: { fontSize: '0.6rem', color: '#10b981' } }, 
-                                                            'Elements (' + (action.targets ? action.targets.length : (action.target ? 1 : 0)) + ' selected)'
+                                                            (() => {
+                                                                // Filter out phantom references - only count elements that actually exist
+                                                                const validElementIds = currentStep.elements.map(el => el.id);
+                                                                let validCount = 0;
+                                                                
+                                                                if (action.targets) {
+                                                                    validCount = action.targets.filter(t => validElementIds.includes(t)).length;
+                                                                } else if (action.target && validElementIds.includes(action.target)) {
+                                                                    validCount = 1;
+                                                                }
+                                                                
+                                                                return 'Elements (' + validCount + ' selected)';
+                                                            })()
                                                         ),
                                                         e('span', { className: 'collapsible-arrow' + (collapsedActions[event.id + '_' + action.id] === false || collapsedActions[event.id + '_' + action.id] === undefined ? '' : ' open') }, '▶')
                                                     ),
@@ -1410,11 +1518,17 @@
                                                                     className: 'form-checkbox',
                                                                     checked: action.targets ? action.targets.includes(el.id) : action.target === el.id,
                                                                     onChange: (ev) => {
+                                                                        // First, clean out any phantom targets (deleted elements)
+                                                                        const validElementIds = currentStep.elements.map(e => e.id);
+                                                                        const existingTargets = action.targets ? action.targets.filter(t => validElementIds.includes(t)) : (action.target && validElementIds.includes(action.target) ? [action.target] : []);
+                                                                        
                                                                         if (ev.target.checked) {
-                                                                            const newTargets = action.targets ? [...action.targets, el.id] : [action.target, el.id].filter(Boolean);
+                                                                            // Add this element
+                                                                            const newTargets = [...existingTargets, el.id];
                                                                             updateEventAction(event.id, action.id, { targets: newTargets, target: '' });
                                                                         } else {
-                                                                            const newTargets = action.targets ? action.targets.filter(t => t !== el.id) : [];
+                                                                            // Remove this element
+                                                                            const newTargets = existingTargets.filter(t => t !== el.id);
                                                                             updateEventAction(event.id, action.id, { targets: newTargets.length > 0 ? newTargets : undefined, target: newTargets.length === 0 ? '' : action.target });
                                                                         }
                                                                     }
