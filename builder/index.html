@@ -34,7 +34,7 @@
         .element:hover { border-color: #f7931a; }
         .element.selected { border-color: #10b981; border-style: solid; }
         .element img, .element video { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
-        .element-text { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 6px; color: white; font-size: 1.5rem; text-align: center; word-wrap: break-word; overflow: hidden; }
+        .element-text { background: rgba(0,0,0,0.8); padding: 15px; border-radius: 6px; color: white; font-size: 1.5rem; text-align: center; word-wrap: break-word; overflow: hidden; white-space: pre-wrap; }
         .element-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; text-align: center; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .element-hotspot { border: 2px solid red; background: rgba(255,0,0,0.1); }
         .element-audio { background: rgba(0,100,200,0.3); border: 2px dashed #00aaff; display: flex; align-items: center; justify-content: center; font-size: 2rem; }
@@ -98,6 +98,41 @@
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: #0a0e27; }
         ::-webkit-scrollbar-thumb { background: #2d3748; border-radius: 3px; }
+        .collapsible-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 4px; background: #1a1f3a; border-radius: 3px; margin-bottom: 3px; }
+        .collapsible-header:hover { background: #252b45; }
+        .collapsible-arrow { transition: transform 0.2s; font-size: 10px; }
+        .collapsible-arrow.open { transform: rotate(90deg); }
+        .collapsible-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-out; }
+        .collapsible-content.open { max-height: 500px; overflow-y: auto; }
+        .element-list-item { padding: 5px 8px; background: #1a1f3a; border: 1px solid #2d3748; border-radius: 3px; margin-bottom: 3px; cursor: pointer; font-size: 0.7rem; display: flex; justify-content: space-between; align-items: center; }
+        .element-list-item:hover { border-color: #f7931a; background: #1f2541; }
+        .element-list-item.selected { border-color: #10b981; background: #1a3a2e; }
+        .element-type-badge { font-size: 0.55rem; padding: 2px 5px; border-radius: 3px; background: #2d3748; color: #9ca3af; }
+        .btn-add-event { background: #10b981 !important; color: #fff !important; }
+        .btn-add-action { background: #f59e0b !important; color: #000 !important; }
+        .event-item { background: #1a1f3a; border: 2px solid #f7931a; border-radius: 6px; padding: 8px; margin-bottom: 8px; }
+        .event-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 4px; background: #252b45; border-radius: 4px; margin-bottom: 5px; }
+        .event-header:hover { background: #2d3450; }
+        .event-drag-handle { cursor: grab; padding: 0 5px; color: #f7931a; }
+        .event-drag-handle:active { cursor: grabbing; }
+        .event-item.drag-over { border: 2px dashed #10b981; background: #1e3a32; }
+        .canvas-grid { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+        .element-object { display: flex; align-items: center; justify-content: center; }
+        .snap-indicator { position: absolute; background: rgba(16, 185, 129, 0.3); pointer-events: none; z-index: 9998; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes wobble { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); } 20%, 40%, 60%, 80% { transform: translateX(2px); } }
+        @keyframes glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        .anim-pulse { animation: pulse 1s ease-in-out infinite; }
+        .anim-spin { animation: spin 2s linear infinite; }
+        .anim-bounce { animation: bounce 0.5s ease-in-out infinite; }
+        .anim-wobble { animation: wobble 0.5s ease-in-out infinite; }
+        .anim-shake { animation: shake 0.5s ease-in-out infinite; }
+        .anim-glow { animation: glow 1.5s ease-in-out infinite; }
+        .anim-float { animation: float 2s ease-in-out infinite; }
     </style>
 </head>
 <body>
@@ -126,8 +161,6 @@
         }
 
         // Stable ID generation system
-        const elementIdCounters = {};
-        
         function getNextElementId(type, existingElements = []) {
             // Find highest existing number for this type
             let maxNum = 0;
@@ -149,15 +182,15 @@
                 label: type + '1',
                 x: 100,
                 y: 100,
-                width: type === 'text' || type === 'button' ? 300 : type === 'audio' ? 200 : type === 'timer' ? 150 : type === 'draggable' ? 100 : 400,
-                height: type === 'text' ? 100 : type === 'button' ? 60 : type === 'audio' ? 60 : type === 'timer' ? 150 : type === 'draggable' ? 100 : 300,
+                width: type === 'text' || type === 'button' ? 300 : type === 'audio' ? 200 : type === 'timer' ? 150 : type === 'draggable' ? 100 : type === 'object' ? 100 : 400,
+                height: type === 'text' ? 100 : type === 'button' ? 60 : type === 'audio' ? 60 : type === 'timer' ? 150 : type === 'draggable' ? 100 : type === 'object' ? 100 : 300,
                 content: '',
                 visible: true,
                 layer: 0,
                 duration: 0,
                 loop: false,
                 autoplay: type === 'audio' || type === 'video',
-                shape: 'rect',
+                shape: type === 'object' ? 'rect' : 'rect',
                 color: '#f7931a',
                 countdown: 10,
                 fontSize: 24,
@@ -165,11 +198,23 @@
                 hotspotMode: 'both',
                 transition: 'none',
                 transitionDuration: 0.5,
+                transitionOut: 'none',
+                transitionOutDuration: 0.5,
+                animationDuring: 'none',
                 textColor: '#ffffff',
                 textBgColor: 'rgba(0,0,0,0.8)',
                 textSize: 24,
                 buttonTextColor: '#ffffff',
-                buttonTextSize: 20
+                buttonTextSize: 20,
+                objectShape: 'rect',
+                objectColor: '#f7931a',
+                scaleX: 1,
+                scaleY: 1,
+                rotation: 0,
+                flipH: false,
+                flipV: false,
+                opacity: 100,
+                textBgOpacity: 80
             };
         }
 
@@ -183,18 +228,30 @@
         }
 
         function StoryBuilder() {
-            const [steps, setSteps] = useState([]);
-            const [currentStepId, setCurrentStepId] = useState(null);
+            // Try to load from localStorage on init
+            const savedData = localStorage.getItem('storyBuilderAutosave');
+            const initialData = savedData ? JSON.parse(savedData) : null;
+            
+            const [steps, setSteps] = useState(initialData?.steps || []);
+            const [currentStepId, setCurrentStepId] = useState(initialData?.currentStepId || null);
             const [selectedElementId, setSelectedElementId] = useState(null);
             const [activeTab, setActiveTab] = useState('elements');
+            const [collapsedActions, setCollapsedActions] = useState({});
+            const [collapsedEvents, setCollapsedEvents] = useState({});
+            const [varyingItems, setVaryingItems] = useState(initialData?.varyingItems || []);
+            const [snapEnabled, setSnapEnabled] = useState(false);
+            const [showGrid, setShowGrid] = useState(true);
+            const [clipboard, setClipboard] = useState(null);
+            const [draggedEventId, setDraggedEventId] = useState(null);
             const [dragging, setDragging] = useState(null);
             const [playMode, setPlayMode] = useState(false);
             const [playStartStep, setPlayStartStep] = useState(null);
             const [draggedStepId, setDraggedStepId] = useState(null);
             const [dragOverStepId, setDragOverStepId] = useState(null);
             const [scale, setScale] = useState(1);
-            const [inventory, setInventory] = useState([]);
+            const [inventory, setInventory] = useState(initialData?.inventory || []);
             const [draggedInPlay, setDraggedInPlay] = useState(null);
+            const [lastSaved, setLastSaved] = useState(null);
             const [exportOptions, setExportOptions] = useState({
                 includeRefreshButton: false,
                 optimizeVideoLoading: false
@@ -214,6 +271,19 @@
                 window.addEventListener('resize', updateScale);
                 return () => window.removeEventListener('resize', updateScale);
             }, []);
+
+            // Autosave to localStorage every 5 seconds when there are changes
+            useEffect(() => {
+                if (steps.length === 0 && inventory.length === 0 && varyingItems.length === 0) return;
+                
+                const autosaveTimer = setTimeout(() => {
+                    const data = { steps, inventory, varyingItems, currentStepId };
+                    localStorage.setItem('storyBuilderAutosave', JSON.stringify(data));
+                    setLastSaved(new Date().toLocaleTimeString());
+                }, 2000);
+                
+                return () => clearTimeout(autosaveTimer);
+            }, [steps, inventory, varyingItems, currentStepId]);
 
             const getCurrentStep = () => steps.find(s => s.id === currentStepId);
             const getSelectedElement = () => {
@@ -340,6 +410,79 @@
                 setInventory(inventory.filter(i => i.name !== item.name));
             };
 
+            const addVaryingItem = () => {
+                const name = prompt('Varying item name (e.g., dollars, points, friends):');
+                if (name && !varyingItems.find(i => i.name === name)) {
+                    setVaryingItems([...varyingItems, { name: name, visible: true }]);
+                }
+            };
+
+            const deleteVaryingItem = (item) => {
+                setVaryingItems(varyingItems.filter(i => i.name !== item.name));
+            };
+
+            const toggleActionCollapse = (actionKey) => {
+                setCollapsedActions(prev => ({ ...prev, [actionKey]: !prev[actionKey] }));
+            };
+
+            const toggleEventCollapse = (eventId) => {
+                setCollapsedEvents(prev => ({ ...prev, [eventId]: !prev[eventId] }));
+            };
+
+            const copyElement = (elem) => {
+                setClipboard({ ...elem, id: null });
+            };
+
+            const pasteElement = () => {
+                if (!clipboard) return;
+                const step = getCurrentStep();
+                if (!step) return;
+                const newElem = {
+                    ...clipboard,
+                    id: getNextElementId(clipboard.type, step.elements),
+                    label: clipboard.label + '_copy',
+                    x: clipboard.x + 20,
+                    y: clipboard.y + 20
+                };
+                setSteps(steps.map(s => s.id === currentStepId ? { ...s, elements: [...s.elements, newElem] } : s));
+                setSelectedElementId(newElem.id);
+            };
+
+            const snapToGrid = (value, gridSize = 51.2) => {
+                return Math.round(value / gridSize) * gridSize;
+            };
+
+            const handleEventDragStart = (ev, eventId) => {
+                setDraggedEventId(eventId);
+                ev.dataTransfer.effectAllowed = 'move';
+            };
+
+            const handleEventDragOver = (ev, eventId) => {
+                ev.preventDefault();
+                ev.dataTransfer.dropEffect = 'move';
+            };
+
+            const handleEventDrop = (ev, targetEventId) => {
+                ev.preventDefault();
+                if (!draggedEventId || draggedEventId === targetEventId) return;
+                
+                const events = [...currentStep.events];
+                const dragIdx = events.findIndex(e => e.id === draggedEventId);
+                const dropIdx = events.findIndex(e => e.id === targetEventId);
+                
+                if (dragIdx === -1 || dropIdx === -1) return;
+                
+                const [draggedEvent] = events.splice(dragIdx, 1);
+                events.splice(dropIdx, 0, draggedEvent);
+                
+                setSteps(steps.map(s => s.id === currentStepId ? { ...s, events } : s));
+                setDraggedEventId(null);
+            };
+
+            const handleEventDragEnd = () => {
+                setDraggedEventId(null);
+            };
+
             const addEvent = () => {
                 const step = getCurrentStep();
                 if (step) {
@@ -394,10 +537,20 @@
             };
 
             const handleMouseDown = (ev, elemId) => {
+                const elem = currentStep?.elements.find(e => e.id === elemId);
                 if (ev.target.classList.contains('resize-handle')) {
                     setDragging({ type: 'resize', elemId });
                 } else {
-                    setDragging({ type: 'move', elemId, startX: ev.clientX, startY: ev.clientY });
+                    const canvas = document.querySelector('.preview');
+                    const rect = canvas.getBoundingClientRect();
+                    const mouseX = (ev.clientX - rect.left) / scale;
+                    const mouseY = (ev.clientY - rect.top) / scale;
+                    setDragging({ 
+                        type: 'move', 
+                        elemId, 
+                        offsetX: mouseX - (elem?.x || 0),
+                        offsetY: mouseY - (elem?.y || 0)
+                    });
                 }
                 setSelectedElementId(elemId);
             };
@@ -408,18 +561,28 @@
                 if (!elem) return;
 
                 if (dragging.type === 'move') {
-                    const dx = (ev.clientX - dragging.startX) / scale;
-                    const dy = (ev.clientY - dragging.startY) / scale;
-                    updateElement(elem.id, {
-                        x: Math.max(0, Math.min(1024 - elem.width, elem.x + dx)),
-                        y: Math.max(0, Math.min(576 - elem.height, elem.y + dy))
-                    });
-                    setDragging({ ...dragging, startX: ev.clientX, startY: ev.clientY });
+                    const canvas = document.querySelector('.preview');
+                    const rect = canvas.getBoundingClientRect();
+                    // Calculate absolute position from mouse
+                    let newX = (ev.clientX - rect.left) / scale - dragging.offsetX;
+                    let newY = (ev.clientY - rect.top) / scale - dragging.offsetY;
+                    // Clamp to canvas bounds
+                    newX = Math.max(0, Math.min(1024 - elem.width, newX));
+                    newY = Math.max(0, Math.min(576 - elem.height, newY));
+                    if (snapEnabled) {
+                        newX = snapToGrid(newX);
+                        newY = snapToGrid(newY);
+                    }
+                    updateElement(elem.id, { x: newX, y: newY });
                 } else if (dragging.type === 'resize') {
                     const canvas = document.querySelector('.preview');
                     const rect = canvas.getBoundingClientRect();
-                    const newWidth = Math.max(50, Math.min(1024 - elem.x, (ev.clientX - rect.left) / scale - elem.x));
-                    const newHeight = Math.max(50, Math.min(576 - elem.y, (ev.clientY - rect.top) / scale - elem.y));
+                    let newWidth = Math.max(50, Math.min(1024 - elem.x, (ev.clientX - rect.left) / scale - elem.x));
+                    let newHeight = Math.max(50, Math.min(576 - elem.y, (ev.clientY - rect.top) / scale - elem.y));
+                    if (snapEnabled) {
+                        newWidth = snapToGrid(newWidth);
+                        newHeight = snapToGrid(newHeight);
+                    }
                     updateElement(elem.id, { width: newWidth, height: newHeight });
                 }
             };
@@ -437,8 +600,21 @@
                 }
             }, [dragging, scale]);
 
+            const newProject = () => {
+                if (steps.length > 0 && !confirm('Start a new project? This will clear current work.\n\n(Your work is autosaved, but starting new will clear it)')) {
+                    return;
+                }
+                setSteps([]);
+                setCurrentStepId(null);
+                setSelectedElementId(null);
+                setInventory([]);
+                setVaryingItems([]);
+                localStorage.removeItem('storyBuilderAutosave');
+                setLastSaved(null);
+            };
+
             const saveProject = () => {
-                const data = JSON.stringify({ steps, inventory }, null, 2);
+                const data = JSON.stringify({ steps, inventory, varyingItems }, null, 2);
                 const blob = new Blob([data], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -472,7 +648,7 @@
                                     }
                                     // Check action targets
                                     ev.actions.forEach(action => {
-                                        if (action.target && !elementIds.includes(action.target) && action.type !== 'goto' && action.type !== 'inventory' && action.type !== 'password') {
+                                        if (action.target && !elementIds.includes(action.target) && action.type !== 'goto' && action.type !== 'inventory' && action.type !== 'password' && action.type !== 'addItem' && action.type !== 'removeItem') {
                                             brokenRefs.push({
                                                 step: step.title,
                                                 issue: `Event action references missing element: ${action.target}`
@@ -498,6 +674,7 @@
                             
                             setSteps(data.steps);
                             setInventory(data.inventory || []);
+                            setVaryingItems(data.varyingItems || []);
                             setCurrentStepId(data.steps[0]?.id);
                             alert(brokenRefs.length > 0 ? 'Loaded with warnings! Check events on steps with issues.' : 'Loaded successfully!');
                         } catch (err) {
@@ -510,7 +687,7 @@
             };
 
             const exportHTML = () => {
-                const html = generateHTML(steps, inventory, exportOptions);
+                const html = generateHTML(steps, inventory, varyingItems, exportOptions);
                 navigator.clipboard.writeText(html).then(() => {
                     alert('✅ HTML copied!');
                 }).catch(() => {
@@ -525,7 +702,7 @@
             };
 
             if (playMode) {
-                return e(PlayMode, { steps, inventory, onExit: () => setPlayMode(false), startStepId: playStartStep || currentStepId });
+                return e(PlayMode, { steps, inventory, varyingItems, onExit: () => setPlayMode(false), startStepId: playStartStep || currentStepId });
             }
 
             const currentStep = getCurrentStep();
@@ -533,7 +710,10 @@
 
             return e('div', { className: 'app' },
                 e('header', { className: 'header' },
-                    e('div', { className: 'logo' }, 'Builder'),
+                    e('div', { style: { display: 'flex', alignItems: 'center', gap: '15px' } },
+                        e('div', { className: 'logo' }, 'Builder'),
+                        lastSaved && e('div', { style: { fontSize: '0.6rem', color: '#10b981' } }, '✓ Saved ' + lastSaved)
+                    ),
                     e('div', { style: { display: 'flex', alignItems: 'center', gap: '10px', fontSize: '11px' } },
                         e('label', { style: { display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', whiteSpace: 'nowrap' } },
                             e('input', { 
@@ -553,11 +733,24 @@
                         )
                     ),
                     e('div', { className: 'header-buttons' },
+                        e('button', { 
+                            className: 'btn ' + (showGrid ? 'btn-primary' : 'btn-secondary'), 
+                            onClick: () => setShowGrid(!showGrid), 
+                            title: 'Toggle Grid',
+                            style: { fontSize: '10px' }
+                        }, '⊞'),
+                        e('button', { 
+                            className: 'btn ' + (snapEnabled ? 'btn-success' : 'btn-secondary'), 
+                            onClick: () => setSnapEnabled(!snapEnabled), 
+                            title: 'Toggle Snap to Grid',
+                            style: { fontSize: '10px' }
+                        }, '🧲'),
                         e('button', { className: 'btn btn-primary', onClick: () => { setPlayStartStep(steps[0]?.id); setPlayMode(true); }, title: 'Test All Steps' }, '▶ All'),
                         e('button', { className: 'btn btn-primary', onClick: () => { setPlayStartStep(currentStepId); setPlayMode(true); }, title: 'Preview Current Step', style: { background: '#10b981' } }, '▶ Step'),
-                        e('button', { className: 'btn btn-secondary', onClick: saveProject }, '💾'),
-                        e('button', { className: 'btn btn-secondary', onClick: loadProject }, '📂'),
-                        e('button', { className: 'btn btn-success', onClick: exportHTML }, '⚡')
+                        e('button', { className: 'btn btn-danger', onClick: newProject, title: 'New Project' }, '🗑️'),
+                        e('button', { className: 'btn btn-secondary', onClick: saveProject, title: 'Save to File' }, '💾'),
+                        e('button', { className: 'btn btn-secondary', onClick: loadProject, title: 'Load from File' }, '📂'),
+                        e('button', { className: 'btn btn-success', onClick: exportHTML, title: 'Export HTML' }, '⚡')
                     )
                 ),
                 
@@ -631,6 +824,16 @@
                 e('main', { className: 'canvas' },
                     e('div', { ref: canvasRef, className: 'preview-container', style: { transform: 'scale(' + scale + ')' } },
                         e('div', { className: 'preview', style: { background: currentStep ? (currentStep.bgColor || '#000') : '#000' } },
+                            showGrid && e('svg', { className: 'canvas-grid', width: '1024', height: '576' },
+                                // Vertical lines every ~102px (10% of 1024)
+                                [0, 102.4, 204.8, 307.2, 409.6, 512, 614.4, 716.8, 819.2, 921.6, 1024].map((x, i) =>
+                                    e('line', { key: 'v' + i, x1: x, y1: 0, x2: x, y2: 576, stroke: i === 5 ? 'rgba(247,147,26,0.4)' : (i === 0 || i === 10 || i === 2 || i === 8) ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)', strokeWidth: i === 5 ? 2 : 1 })
+                                ),
+                                // Horizontal lines every ~57.6px (10% of 576)
+                                [0, 57.6, 115.2, 172.8, 230.4, 288, 345.6, 403.2, 460.8, 518.4, 576].map((y, i) =>
+                                    e('line', { key: 'h' + i, x1: 0, y1: y, x2: 1024, y2: y, stroke: i === 5 ? 'rgba(247,147,26,0.4)' : (i === 0 || i === 10 || i === 2 || i === 8) ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)', strokeWidth: i === 5 ? 2 : 1 })
+                                )
+                            ),
                             currentStep && currentStep.bgShapes && currentStep.bgShapes.map(shape =>
                                 e('div', {
                                     key: shape.id,
@@ -666,7 +869,7 @@
                                             onMouseDown: (ev) => handleMouseDown(ev, elem.id)
                                         },
                                             e('div', { className: 'element-label' }, elem.label),
-                                            elem.type === 'image' && elem.content && e('img', { src: elem.content }),
+                                            elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)', opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100 } }),
                                             elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: true, loop: elem.loop, playsInline: true }),
                                             elem.type === 'text' && e('div', { 
                                     className: 'element-text',
@@ -688,6 +891,18 @@
                                                 e('div', { style: { fontSize: elem.fontSize + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' } }, elem.content || '📦')
                                             ),
                                             elem.type === 'hotspot' && e('div', { style: { width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.8rem' } }, elem.label),
+                                            elem.type === 'object' && e('div', { 
+                                                className: 'element-object',
+                                                style: { 
+                                                    width: '100%', 
+                                                    height: '100%', 
+                                                    background: elem.objectColor || elem.color || '#f7931a',
+                                                    borderRadius: elem.objectShape === 'circle' ? '50%' : '0',
+                                                    clipPath: elem.objectShape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 'none',
+                                                    transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)',
+                                                    opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100
+                                                }
+                                            }),
                                             e('div', { className: 'resize-handle' })
                                         )
                                     ) :
@@ -724,7 +939,8 @@
                             e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('audio') }, '🔊 Audio'),
                             e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('timer') }, '⏱️ Timer'),
                             e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('draggable') }, '🎯 Draggable'),
-                            e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '8px' }, onClick: () => addElement('hotspot') }, '📍 Hotspot'),
+                            e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('hotspot') }, '📍 Hotspot'),
+                            e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '8px' }, onClick: () => addElement('object') }, '⬜ Object'),
                             
                             selectedElement && e('div', null,
                                 e('div', { className: 'section-title' }, selectedElement.label),
@@ -768,7 +984,7 @@
                                     })
                                 ),
 
-                                (selectedElement.type !== 'hotspot' && selectedElement.type !== 'audio' && selectedElement.type !== 'timer' && selectedElement.type !== 'draggable') && e('div', { className: 'form-group' },
+                                (selectedElement.type !== 'hotspot' && selectedElement.type !== 'audio' && selectedElement.type !== 'timer' && selectedElement.type !== 'draggable' && selectedElement.type !== 'object') && e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, selectedElement.type === 'text' || selectedElement.type === 'button' ? 'Text' : 'URL or Upload'),
                                     selectedElement.type === 'text' || selectedElement.type === 'button' ?
                                         e('textarea', { className: 'form-textarea', value: selectedElement.content, onChange: (ev) => updateElement(selectedElement.id, { content: ev.target.value }) }) :
@@ -842,21 +1058,50 @@
                                     e('label', { className: 'form-label' }, 'Duration (0=forever)'),
                                     e('input', { type: 'number', className: 'form-input', value: selectedElement.duration, onChange: (ev) => updateElement(selectedElement.id, { duration: parseFloat(ev.target.value) || 0 }) })
                                 ),
-                                (selectedElement.type === 'image' || selectedElement.type === 'text') && e('div', { className: 'form-group' },
-                                    e('label', { className: 'form-label' }, 'Transition'),
+                                (selectedElement.type === 'image' || selectedElement.type === 'text' || selectedElement.type === 'object') && e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, '▶ Intro Animation'),
                                     e('select', { className: 'form-select', value: selectedElement.transition || 'none', onChange: (ev) => updateElement(selectedElement.id, { transition: ev.target.value }) },
                                         e('option', { value: 'none' }, 'None'),
-                                        e('option', { value: 'fade' }, 'Fade In/Out'),
+                                        e('option', { value: 'fade' }, 'Fade In'),
                                         e('option', { value: 'slideLeft' }, 'Slide from Left'),
                                         e('option', { value: 'slideRight' }, 'Slide from Right'),
                                         e('option', { value: 'slideUp' }, 'Slide from Top'),
                                         e('option', { value: 'slideDown' }, 'Slide from Bottom'),
-                                        e('option', { value: 'zoom' }, 'Zoom In/Out')
+                                        e('option', { value: 'zoom' }, 'Zoom In')
                                     )
                                 ),
-                                (selectedElement.type === 'image' || selectedElement.type === 'text') && selectedElement.transition && selectedElement.transition !== 'none' && e('div', { className: 'form-group' },
-                                    e('label', { className: 'form-label' }, 'Transition Speed (seconds)'),
+                                (selectedElement.type === 'image' || selectedElement.type === 'text' || selectedElement.type === 'object') && selectedElement.transition && selectedElement.transition !== 'none' && e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Intro Duration (sec)'),
                                     e('input', { type: 'number', step: '0.1', className: 'form-input', value: selectedElement.transitionDuration || 0.5, onChange: (ev) => updateElement(selectedElement.id, { transitionDuration: parseFloat(ev.target.value) || 0.5 }) })
+                                ),
+                                (selectedElement.type === 'image' || selectedElement.type === 'text' || selectedElement.type === 'object') && e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, '🔄 During Animation'),
+                                    e('select', { className: 'form-select', value: selectedElement.animationDuring || 'none', onChange: (ev) => updateElement(selectedElement.id, { animationDuring: ev.target.value }) },
+                                        e('option', { value: 'none' }, 'None'),
+                                        e('option', { value: 'pulse' }, 'Pulse'),
+                                        e('option', { value: 'spin' }, 'Spin'),
+                                        e('option', { value: 'bounce' }, 'Bounce'),
+                                        e('option', { value: 'wobble' }, 'Wobble'),
+                                        e('option', { value: 'shake' }, 'Shake'),
+                                        e('option', { value: 'glow' }, 'Glow'),
+                                        e('option', { value: 'float' }, 'Float')
+                                    )
+                                ),
+                                (selectedElement.type === 'image' || selectedElement.type === 'text' || selectedElement.type === 'object') && e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, '◀ Outro Animation'),
+                                    e('select', { className: 'form-select', value: selectedElement.transitionOut || 'none', onChange: (ev) => updateElement(selectedElement.id, { transitionOut: ev.target.value }) },
+                                        e('option', { value: 'none' }, 'None (use Intro reverse)'),
+                                        e('option', { value: 'fade' }, 'Fade Out'),
+                                        e('option', { value: 'slideLeft' }, 'Slide to Left'),
+                                        e('option', { value: 'slideRight' }, 'Slide to Right'),
+                                        e('option', { value: 'slideUp' }, 'Slide to Top'),
+                                        e('option', { value: 'slideDown' }, 'Slide to Bottom'),
+                                        e('option', { value: 'zoom' }, 'Zoom Out')
+                                    )
+                                ),
+                                (selectedElement.type === 'image' || selectedElement.type === 'text' || selectedElement.type === 'object') && selectedElement.transitionOut && selectedElement.transitionOut !== 'none' && e('div', { className: 'form-group' },
+                                    e('label', { className: 'form-label' }, 'Outro Duration (sec)'),
+                                    e('input', { type: 'number', step: '0.1', className: 'form-input', value: selectedElement.transitionOutDuration || 0.5, onChange: (ev) => updateElement(selectedElement.id, { transitionOutDuration: parseFloat(ev.target.value) || 0.5 }) })
                                 ),
                                 selectedElement.type === 'text' && e('div', null,
                                     e('div', { className: 'form-group' },
@@ -872,8 +1117,8 @@
                                         e('input', { type: 'color', className: 'form-input', value: selectedElement.textBgColor ? selectedElement.textBgColor.replace('rgba(0,0,0,0.8)', '#000000') : '#000000', onChange: (ev) => updateElement(selectedElement.id, { textBgColor: ev.target.value }) })
                                     ),
                                     e('div', { className: 'form-group' },
-                                        e('label', { className: 'form-label' }, 'Background Opacity'),
-                                        e('input', { type: 'range', min: '0', max: '1', step: '0.1', className: 'form-input', value: selectedElement.textBgOpacity || 0.8, onChange: (ev) => updateElement(selectedElement.id, { textBgOpacity: parseFloat(ev.target.value) }) })
+                                        e('label', { className: 'form-label' }, 'Background Opacity (0-100)'),
+                                        e('input', { type: 'number', min: '0', max: '100', className: 'form-input', value: selectedElement.textBgOpacity !== undefined ? Math.round(selectedElement.textBgOpacity * 100) : 80, onChange: (ev) => updateElement(selectedElement.id, { textBgOpacity: Math.max(0, Math.min(100, parseInt(ev.target.value) || 0)) / 100 }) })
                                     )
                                 ),
                                 (selectedElement.type === 'audio' || selectedElement.type === 'video') && e('div', { className: 'form-group' },
@@ -889,47 +1134,204 @@
                                         e('option', { value: 'circle' }, 'Circle')
                                     )
                                 ),
-                                e('button', { className: 'btn btn-danger btn-small', style: { width: '100%' }, onClick: () => deleteElement(selectedElement.id) }, 'Delete')
+                                selectedElement.type === 'object' && e('div', null,
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Object Shape'),
+                                        e('select', { className: 'form-select', value: selectedElement.objectShape || 'rect', onChange: (ev) => updateElement(selectedElement.id, { objectShape: ev.target.value }) },
+                                            e('option', { value: 'rect' }, 'Rectangle'),
+                                            e('option', { value: 'circle' }, 'Circle/Oval'),
+                                            e('option', { value: 'triangle' }, 'Triangle')
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Object Color'),
+                                        e('input', { type: 'color', className: 'form-input', value: selectedElement.objectColor || '#f7931a', onChange: (ev) => updateElement(selectedElement.id, { objectColor: ev.target.value }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Opacity (0-100)'),
+                                        e('input', { type: 'number', min: '0', max: '100', className: 'form-input', value: selectedElement.opacity !== undefined ? selectedElement.opacity : 100, onChange: (ev) => updateElement(selectedElement.id, { opacity: Math.max(0, Math.min(100, parseInt(ev.target.value) || 0)) }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Scale X (stretch)'),
+                                        e('input', { type: 'range', min: '0.2', max: '3', step: '0.1', className: 'form-input', value: selectedElement.scaleX || 1, onChange: (ev) => updateElement(selectedElement.id, { scaleX: parseFloat(ev.target.value) }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Scale Y (stretch)'),
+                                        e('input', { type: 'range', min: '0.2', max: '3', step: '0.1', className: 'form-input', value: selectedElement.scaleY || 1, onChange: (ev) => updateElement(selectedElement.id, { scaleY: parseFloat(ev.target.value) }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Rotation'),
+                                        e('div', { style: { display: 'flex', gap: '3px', flexWrap: 'wrap' } },
+                                            [0, 45, 90, 135, 180, 225, 270, 315].map(deg =>
+                                                e('button', { 
+                                                    key: deg,
+                                                    className: 'btn btn-small ' + ((selectedElement.rotation || 0) === deg ? 'btn-primary' : 'btn-secondary'),
+                                                    style: { padding: '3px 6px', fontSize: '0.6rem' },
+                                                    onClick: () => updateElement(selectedElement.id, { rotation: deg })
+                                                }, deg + '°')
+                                            )
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Flip'),
+                                        e('div', { style: { display: 'flex', gap: '5px' } },
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipH ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipH: !selectedElement.flipH })
+                                            }, '↔ Horizontal'),
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipV ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipV: !selectedElement.flipV })
+                                            }, '↕ Vertical')
+                                        )
+                                    )
+                                ),
+                                selectedElement.type === 'image' && e('div', null,
+                                    e('div', { className: 'section-title', style: { marginTop: '10px' } }, 'Transform'),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Opacity (0-100)'),
+                                        e('input', { type: 'number', min: '0', max: '100', className: 'form-input', value: selectedElement.opacity !== undefined ? selectedElement.opacity : 100, onChange: (ev) => updateElement(selectedElement.id, { opacity: Math.max(0, Math.min(100, parseInt(ev.target.value) || 0)) }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Rotation'),
+                                        e('div', { style: { display: 'flex', gap: '3px', flexWrap: 'wrap' } },
+                                            [0, 45, 90, 135, 180, 225, 270, 315].map(deg =>
+                                                e('button', { 
+                                                    key: deg,
+                                                    className: 'btn btn-small ' + ((selectedElement.rotation || 0) === deg ? 'btn-primary' : 'btn-secondary'),
+                                                    style: { padding: '3px 6px', fontSize: '0.6rem' },
+                                                    onClick: () => updateElement(selectedElement.id, { rotation: deg })
+                                                }, deg + '°')
+                                            )
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Flip'),
+                                        e('div', { style: { display: 'flex', gap: '5px' } },
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipH ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipH: !selectedElement.flipH })
+                                            }, '↔ Horizontal'),
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.flipV ? 'btn-primary' : 'btn-secondary'),
+                                                onClick: () => updateElement(selectedElement.id, { flipV: !selectedElement.flipV })
+                                            }, '↕ Vertical')
+                                        )
+                                    )
+                                ),
+                                e('div', { style: { display: 'flex', gap: '5px', marginTop: '10px' } },
+                                    e('button', { className: 'btn btn-secondary btn-small', style: { flex: 1 }, onClick: () => copyElement(selectedElement) }, '📋 Copy'),
+                                    e('button', { className: 'btn btn-danger btn-small', style: { flex: 1 }, onClick: () => deleteElement(selectedElement.id) }, '🗑️ Delete')
+                                )
+                            ),
+
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'All Elements'),
+                            clipboard && e('button', { className: 'btn btn-success btn-small', style: { width: '100%', marginBottom: '5px' }, onClick: pasteElement }, '📋 Paste: ' + clipboard.label),
+                            e('div', { style: { maxHeight: '200px', overflowY: 'auto' } },
+                                currentStep.elements.length === 0 ? 
+                                    e('div', { style: { fontSize: '0.7rem', color: '#6b7280', padding: '10px', textAlign: 'center' } }, 'No elements yet') :
+                                    currentStep.elements.map(el =>
+                                        e('div', { 
+                                            key: el.id, 
+                                            className: 'element-list-item' + (selectedElementId === el.id ? ' selected' : ''),
+                                            onClick: () => setSelectedElementId(el.id)
+                                        },
+                                            e('span', null, el.label),
+                                            e('span', { className: 'element-type-badge' }, el.type)
+                                        )
+                                    )
                             )
                         ),
 
                         activeTab === 'events' && e('div', null,
-                            e('div', { className: 'info-box' }, 'Events trigger actions. Add conditions to check inventory.'),
-                            currentStep.events.map(event =>
-                                e('div', { key: event.id, className: 'event-item' },
-                                    e('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '5px' } },
-                                        e('select', { className: 'form-select', style: { flex: 1, marginRight: '4px', fontSize: '0.6rem' }, value: event.trigger.type, onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, type: ev.target.value } }) },
-                                            e('option', { value: 'onLoad' }, 'On Load'),
-                                            e('option', { value: 'afterDelay' }, 'After Delay'),
-                                            e('option', { value: 'afterElement' }, 'After Element'),
-                                            e('option', { value: 'onClick' }, 'On Click'),
-                                            e('option', { value: 'onDrop' }, 'On Drop')
+                            e('div', { className: 'info-box' }, 'Events trigger actions. Drag ≡ to reorder. Events run top-to-bottom.'),
+                            currentStep.events.map((event, idx) =>
+                                e('div', { 
+                                    key: event.id, 
+                                    className: 'event-item' + (draggedEventId === event.id ? ' drag-over' : ''),
+                                    onDragOver: (ev) => handleEventDragOver(ev, event.id),
+                                    onDrop: (ev) => handleEventDrop(ev, event.id)
+                                },
+                                    e('div', { 
+                                        className: 'event-header',
+                                        onClick: () => toggleEventCollapse(event.id)
+                                    },
+                                        e('div', { style: { display: 'flex', alignItems: 'center', gap: '8px' } },
+                                            e('span', { 
+                                                className: 'event-drag-handle',
+                                                draggable: true,
+                                                onDragStart: (ev) => handleEventDragStart(ev, event.id),
+                                                onDragEnd: handleEventDragEnd,
+                                                onClick: (ev) => ev.stopPropagation()
+                                            }, '≡'),
+                                            e('span', { style: { fontSize: '0.7rem', fontWeight: 600, color: '#f7931a' } }, 'Event ' + (idx + 1)),
+                                            e('span', { style: { fontSize: '0.6rem', color: '#9ca3af' } }, ' - ' + event.trigger.type)
                                         ),
-                                        e('button', { className: 'btn btn-danger btn-small', onClick: () => deleteEvent(event.id) }, '×')
-                                    ),
-                                    event.trigger.type === 'afterDelay' && e('input', { type: 'number', className: 'form-input', placeholder: 'Seconds', value: event.trigger.delay || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, delay: parseFloat(ev.target.value) || 0 } }), style: { marginBottom: '5px' } }),
-                                    event.trigger.type === 'afterElement' && e('select', { className: 'form-select', value: event.trigger.sourceElement || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, sourceElement: ev.target.value } }), style: { marginBottom: '5px' } },
-                                        e('option', { value: '' }, '-- Select Element --'),
-                                        currentStep.elements.map(el => e('option', { key: el.id, value: el.id }, el.label))
-                                    ),
-                                    (event.trigger.type === 'onClick' || event.trigger.type === 'onDrop') && e('select', { className: 'form-select', value: event.trigger.sourceElement || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, sourceElement: ev.target.value } }), style: { marginBottom: '5px' } },
-                                        e('option', { value: '' }, event.trigger.type === 'onClick' ? '-- Click Target --' : '-- Drop Zone --'),
-                                        currentStep.elements.filter(el => el.type === 'button' || el.type === 'hotspot').map(el => e('option', { key: el.id, value: el.id }, el.label))
-                                    ),
-                                    
-                                    event.condition && e('div', { className: 'condition-box' },
-                                        e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' } },
-                                            e('span', { style: { fontSize: '0.6rem', fontWeight: 700 } }, 'CONDITION'),
-                                            e('button', { className: 'btn btn-danger btn-small', onClick: () => updateEvent(event.id, { condition: null }) }, '×')
-                                        ),
-                                        e('select', { className: 'form-select', value: event.condition.type, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, type: ev.target.value } }), style: { marginBottom: '3px', fontSize: '0.6rem' } },
-                                            e('option', { value: 'hasItem' }, 'Has Item'),
-                                            e('option', { value: 'notHasItem' }, 'Does NOT Have Item')
-                                        ),
-                                        e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }) },
-                                            e('option', { value: '' }, '-- Item --'),
-                                            inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
+                                        e('div', { style: { display: 'flex', alignItems: 'center', gap: '5px' } },
+                                            e('span', { className: 'collapsible-arrow' + (collapsedEvents[event.id] ? '' : ' open') }, '▶'),
+                                            e('button', { 
+                                                className: 'btn btn-danger btn-small', 
+                                                onClick: (ev) => { ev.stopPropagation(); deleteEvent(event.id); },
+                                                style: { padding: '2px 6px' }
+                                            }, '×')
                                         )
+                                    ),
+                                    e('div', { className: 'collapsible-content' + (!collapsedEvents[event.id] ? ' open' : '') },
+                                        e('div', { style: { display: 'flex', justifyContent: 'space-between', marginBottom: '5px', marginTop: '5px' } },
+                                            e('select', { className: 'form-select', style: { flex: 1, marginRight: '4px', fontSize: '0.6rem' }, value: event.trigger.type, onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, type: ev.target.value } }) },
+                                                e('option', { value: 'onLoad' }, 'On Load'),
+                                                e('option', { value: 'afterDelay' }, 'After Delay'),
+                                                e('option', { value: 'afterElement' }, 'After Element'),
+                                                e('option', { value: 'onClick' }, 'On Click'),
+                                                e('option', { value: 'onDrop' }, 'On Drop')
+                                            )
+                                        ),
+                                        event.trigger.type === 'afterDelay' && e('input', { type: 'number', className: 'form-input', placeholder: 'Seconds', value: event.trigger.delay || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, delay: parseFloat(ev.target.value) || 0 } }), style: { marginBottom: '5px' } }),
+                                        event.trigger.type === 'afterElement' && e('select', { className: 'form-select', value: event.trigger.sourceElement || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, sourceElement: ev.target.value } }), style: { marginBottom: '5px' } },
+                                            e('option', { value: '' }, '-- Select Element --'),
+                                            currentStep.elements.map(el => e('option', { key: el.id, value: el.id }, el.label))
+                                        ),
+                                        (event.trigger.type === 'onClick' || event.trigger.type === 'onDrop') && e('select', { className: 'form-select', value: event.trigger.sourceElement || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, sourceElement: ev.target.value } }), style: { marginBottom: '5px' } },
+                                            e('option', { value: '' }, event.trigger.type === 'onClick' ? '-- Click Target --' : '-- Drop Zone --'),
+                                            currentStep.elements.filter(el => el.type === 'button' || el.type === 'hotspot').map(el => e('option', { key: el.id, value: el.id }, el.label))
+                                        ),
+                                        
+                                        event.condition && e('div', { className: 'condition-box' },
+                                            e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '3px' } },
+                                                e('span', { style: { fontSize: '0.6rem', fontWeight: 700 } }, 'CONDITION'),
+                                                e('button', { className: 'btn btn-danger btn-small', onClick: () => updateEvent(event.id, { condition: null }) }, '×')
+                                            ),
+                                            e('select', { className: 'form-select', value: event.condition.type, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, type: ev.target.value } }), style: { marginBottom: '3px', fontSize: '0.6rem' } },
+                                                e('option', { value: 'hasItem' }, 'Has Item'),
+                                                e('option', { value: 'notHasItem' }, 'Does NOT Have Item'),
+                                                e('option', { value: 'varyingAtLeast' }, '📊 Has At Least'),
+                                                e('option', { value: 'varyingAtMost' }, '📊 Has At Most'),
+                                            e('option', { value: 'varyingBetween' }, '📊 Has Between')
+                                        ),
+                                        (event.condition.type === 'hasItem' || event.condition.type === 'notHasItem') ?
+                                            e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }) },
+                                                e('option', { value: '' }, '-- Item --'),
+                                                inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
+                                            ) :
+                                        (event.condition.type === 'varyingAtLeast' || event.condition.type === 'varyingAtMost') ?
+                                            e('div', null,
+                                                e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }), style: { marginBottom: '3px' } },
+                                                    e('option', { value: '' }, '-- Varying Item --'),
+                                                    varyingItems.map(item => e('option', { key: item.name, value: item.name }, item.name))
+                                                ),
+                                                e('input', { type: 'number', className: 'form-input', placeholder: 'Amount', value: event.condition.amount || 0, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, amount: parseFloat(ev.target.value) || 0 } }) })
+                                            ) :
+                                        event.condition.type === 'varyingBetween' ?
+                                            e('div', null,
+                                                e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }), style: { marginBottom: '3px' } },
+                                                    e('option', { value: '' }, '-- Varying Item --'),
+                                                    varyingItems.map(item => e('option', { key: item.name, value: item.name }, item.name))
+                                                ),
+                                                e('div', { style: { display: 'flex', gap: '5px' } },
+                                                    e('input', { type: 'number', className: 'form-input', placeholder: 'Min', value: event.condition.min || 0, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, min: parseFloat(ev.target.value) || 0 } }) }),
+                                                    e('input', { type: 'number', className: 'form-input', placeholder: 'Max', value: event.condition.max || 0, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, max: parseFloat(ev.target.value) || 0 } }) })
+                                                )
+                                            ) : null
                                     ),
                                     !event.condition && e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '5px' }, onClick: () => updateEvent(event.id, { condition: { type: 'hasItem', item: '' } }) }, '+ Add Condition'),
                                     
@@ -942,7 +1344,9 @@
                                                 e('option', { value: 'hideDelay' }, 'Hide (Delayed)'),
                                                 e('option', { value: 'goto' }, 'Go To Step'),
                                                 e('option', { value: 'addItem' }, 'Add Inventory'),
-                                                e('option', { value: 'removeItem' }, 'Remove Inventory')
+                                                e('option', { value: 'removeItem' }, 'Remove Inventory'),
+                                                e('option', { value: 'addVarying' }, '📊 Add to Varying'),
+                                                e('option', { value: 'subtractVarying' }, '📊 Subtract from Varying')
                                             ),
                                             action.type === 'goto' ?
                                                 e('div', null,
@@ -972,30 +1376,51 @@
                                                     e('option', { value: '' }, '-- Item --'),
                                                     inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
                                                 ) :
+                                            action.type === 'addVarying' || action.type === 'subtractVarying' ?
+                                                e('div', null,
+                                                    e('select', { className: 'form-select', value: action.target, onChange: (ev) => updateEventAction(event.id, action.id, { target: ev.target.value }), style: { marginBottom: '5px' } },
+                                                        e('option', { value: '' }, '-- Varying Item --'),
+                                                        varyingItems.map(item => e('option', { key: item.name, value: item.name }, item.name))
+                                                    ),
+                                                    e('div', { className: 'form-group', style: { marginBottom: '0' } },
+                                                        e('label', { className: 'form-label' }, 'Amount'),
+                                                        e('input', { type: 'number', className: 'form-input', value: action.amount || 0, onChange: (ev) => updateEventAction(event.id, action.id, { amount: parseFloat(ev.target.value) || 0 }) })
+                                                    )
+                                                ) :
                                             (action.type === 'show' || action.type === 'hide' || action.type === 'showDelay' || action.type === 'hideDelay') ?
                                                 e('div', null,
                                                     (action.type === 'showDelay' || action.type === 'hideDelay') && e('div', { className: 'form-group', style: { marginBottom: '5px' } },
                                                         e('label', { className: 'form-label' }, 'Delay (seconds)'),
                                                         e('input', { type: 'number', step: '0.1', className: 'form-input', value: action.delay || 0, onChange: (ev) => updateEventAction(event.id, action.id, { delay: parseFloat(ev.target.value) || 0 }) })
                                                     ),
-                                                    e('div', { style: { fontSize: '0.6rem', color: '#10b981', marginBottom: '3px' } }, 'Select multiple:'),
-                                                    currentStep.elements.map(el =>
-                                                        e('label', { key: el.id, style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', marginBottom: '2px', cursor: 'pointer' } },
-                                                            e('input', { 
-                                                                type: 'checkbox', 
-                                                                className: 'form-checkbox',
-                                                                checked: action.targets ? action.targets.includes(el.id) : action.target === el.id,
-                                                                onChange: (ev) => {
-                                                                    if (ev.target.checked) {
-                                                                        const newTargets = action.targets ? [...action.targets, el.id] : [action.target, el.id].filter(Boolean);
-                                                                        updateEventAction(event.id, action.id, { targets: newTargets, target: '' });
-                                                                    } else {
-                                                                        const newTargets = action.targets ? action.targets.filter(t => t !== el.id) : [];
-                                                                        updateEventAction(event.id, action.id, { targets: newTargets.length > 0 ? newTargets : undefined, target: newTargets.length === 0 ? '' : action.target });
+                                                    e('div', { 
+                                                        className: 'collapsible-header', 
+                                                        onClick: () => toggleActionCollapse(event.id + '_' + action.id)
+                                                    },
+                                                        e('span', { style: { fontSize: '0.6rem', color: '#10b981' } }, 
+                                                            'Elements (' + (action.targets ? action.targets.length : (action.target ? 1 : 0)) + ' selected)'
+                                                        ),
+                                                        e('span', { className: 'collapsible-arrow' + (collapsedActions[event.id + '_' + action.id] === false || collapsedActions[event.id + '_' + action.id] === undefined ? '' : ' open') }, '▶')
+                                                    ),
+                                                    e('div', { className: 'collapsible-content' + (collapsedActions[event.id + '_' + action.id] ? ' open' : '') },
+                                                        currentStep.elements.map(el =>
+                                                            e('label', { key: el.id, style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', marginBottom: '2px', cursor: 'pointer' } },
+                                                                e('input', { 
+                                                                    type: 'checkbox', 
+                                                                    className: 'form-checkbox',
+                                                                    checked: action.targets ? action.targets.includes(el.id) : action.target === el.id,
+                                                                    onChange: (ev) => {
+                                                                        if (ev.target.checked) {
+                                                                            const newTargets = action.targets ? [...action.targets, el.id] : [action.target, el.id].filter(Boolean);
+                                                                            updateEventAction(event.id, action.id, { targets: newTargets, target: '' });
+                                                                        } else {
+                                                                            const newTargets = action.targets ? action.targets.filter(t => t !== el.id) : [];
+                                                                            updateEventAction(event.id, action.id, { targets: newTargets.length > 0 ? newTargets : undefined, target: newTargets.length === 0 ? '' : action.target });
+                                                                        }
                                                                     }
-                                                                }
-                                                            }),
-                                                            el.label
+                                                                }),
+                                                                el.label
+                                                            )
                                                         )
                                                     )
                                                 ) :
@@ -1006,10 +1431,11 @@
                                             e('button', { className: 'btn btn-danger btn-small', onClick: () => deleteEventAction(event.id, action.id), style: { marginTop: '3px', width: '100%' } }, 'Remove')
                                         )
                                     ),
-                                    e('button', { className: 'add-btn', onClick: () => addEventAction(event.id) }, '+ Action')
+                                    e('button', { className: 'add-btn btn-add-action', onClick: () => addEventAction(event.id) }, '+ Action')
+                                    )
                                 )
                             ),
-                            e('button', { className: 'add-btn', onClick: addEvent }, '+ Event')
+                            e('button', { className: 'add-btn btn-add-event', onClick: addEvent }, '+ Event')
                         ),
 
                         activeTab === 'inventory' && e('div', null,
@@ -1035,7 +1461,28 @@
                                     e('button', { className: 'btn btn-danger btn-small', onClick: () => deleteInventoryItem(item) }, '×')
                                 )
                             ),
-                            e('button', { className: 'add-btn', onClick: addInventoryItem }, '+ Item')
+                            e('button', { className: 'add-btn', onClick: addInventoryItem }, '+ Item'),
+
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'Varying Items'),
+                            e('div', { className: 'info-box' }, 'Items with numeric values (money, points, etc). Use actions to add/subtract.'),
+                            varyingItems.map(item =>
+                                e('div', { key: item.name, style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px', background: '#1a1f3a', marginBottom: '4px', borderRadius: '4px', border: '1px solid #f59e0b' } },
+                                    e('span', { style: { fontSize: '0.75rem', flex: 1, color: '#f59e0b' } }, '📊 ' + item.name),
+                                    e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.6rem', marginRight: '8px', cursor: 'pointer' } },
+                                        e('input', { 
+                                            type: 'checkbox', 
+                                            className: 'form-checkbox',
+                                            checked: item.visible,
+                                            onChange: (ev) => {
+                                                setVaryingItems(varyingItems.map(i => i.name === item.name ? { ...i, visible: ev.target.checked } : i));
+                                            }
+                                        }),
+                                        'Visible'
+                                    ),
+                                    e('button', { className: 'btn btn-danger btn-small', onClick: () => deleteVaryingItem(item) }, '×')
+                                )
+                            ),
+                            e('button', { className: 'add-btn', onClick: addVaryingItem }, '+ Varying Item')
                         ),
 
                         activeTab === 'settings' && e('div', null,
@@ -1082,10 +1529,11 @@
             );
         }
 
-        function PlayMode({ steps, inventory, onExit, startStepId }) {
+        function PlayMode({ steps, inventory, varyingItems, onExit, startStepId }) {
             const [currentStepId, setCurrentStepId] = useState(startStepId || steps[0]?.id);
             const [visibleElements, setVisibleElements] = useState({});
             const [playerInventory, setPlayerInventory] = useState([]);
+            const [playerVaryingValues, setPlayerVaryingValues] = useState({});
             const [activeTimers, setActiveTimers] = useState({});
             const [eventTimers, setEventTimers] = useState([]);
             const [draggedItem, setDraggedItem] = useState(null);
@@ -1171,24 +1619,6 @@
                 
                 setEventTimers(newTimers);
 
-                setTimeout(() => {
-                    const videos = document.querySelectorAll('video');
-                    videos.forEach(video => {
-                        const elem = currentStep.elements.find(e => e.content && video.src.includes(e.content));
-                        if (elem) {
-                            video.onended = () => {
-                                currentStep.events.forEach(event => {
-                                    if (event.trigger.type === 'afterElement' && event.trigger.sourceElement === elem.id) {
-                                        if (checkCondition(event.condition)) {
-                                            processActions(event.actions);
-                                        }
-                                    }
-                                });
-                            };
-                        }
-                    });
-                }, 100);
-
                 return () => {
                     newTimers.forEach(timer => clearTimeout(timer));
                 };
@@ -1200,6 +1630,13 @@
                     return playerInventory.includes(condition.item);
                 } else if (condition.type === 'notHasItem') {
                     return !playerInventory.includes(condition.item);
+                } else if (condition.type === 'varyingAtLeast') {
+                    return (playerVaryingValues[condition.item] || 0) >= (condition.amount || 0);
+                } else if (condition.type === 'varyingAtMost') {
+                    return (playerVaryingValues[condition.item] || 0) <= (condition.amount || 0);
+                } else if (condition.type === 'varyingBetween') {
+                    const val = playerVaryingValues[condition.item] || 0;
+                    return val >= (condition.min || 0) && val <= (condition.max || 0);
                 }
                 return true;
             };
@@ -1288,11 +1725,13 @@
                             elementsToHide.forEach(targetId => {
                                 if (!targetId) return;
                                 const elem = currentStep.elements.find(e => e.id === targetId);
-                                if (elem && elem.transition && elem.transition !== 'none') {
+                                const outTrans = elem?.transitionOut && elem.transitionOut !== 'none' ? elem.transitionOut : elem?.transition;
+                                const outDur = elem?.transitionOut && elem.transitionOut !== 'none' ? (elem.transitionOutDuration || 0.5) : (elem?.transitionDuration || 0.5);
+                                if (outTrans && outTrans !== 'none') {
                                     // Mark as hiding to show out-transition
                                     setHidingElements(prev => ({ ...prev, [targetId]: true }));
                                     // Actually hide after transition duration
-                                    const duration = (elem.transitionDuration || 0.5) * 1000;
+                                    const duration = outDur * 1000;
                                     const timer = setTimeout(() => {
                                         setVisibleElements(prev => ({ ...prev, [targetId]: false }));
                                         setHidingElements(prev => ({ ...prev, [targetId]: false }));
@@ -1322,6 +1761,21 @@
                         setPlayerInventory(prev => prev.includes(action.target) ? prev : [...prev, action.target]);
                     } else if (action.type === 'removeItem') {
                         setPlayerInventory(prev => prev.filter(item => item !== action.target));
+                    } else if (action.type === 'addVarying') {
+                        setPlayerVaryingValues(prev => ({ ...prev, [action.target]: (prev[action.target] || 0) + (action.amount || 0) }));
+                    } else if (action.type === 'subtractVarying') {
+                        setPlayerVaryingValues(prev => ({ ...prev, [action.target]: (prev[action.target] || 0) - (action.amount || 0) }));
+                    }
+                });
+            };
+
+            const handleVideoEnd = (elem) => {
+                if (!currentStep) return;
+                currentStep.events.forEach(event => {
+                    if (event.trigger.type === 'afterElement' && event.trigger.sourceElement === elem.id) {
+                        if (checkCondition(event.condition)) {
+                            processActions(event.actions);
+                        }
                     }
                 });
             };
@@ -1424,12 +1878,15 @@
                         .sort((a, b) => a.layer - b.layer)
                         .map(elem => {
                             const isHiding = hidingElements[elem.id];
-                            const transClass = elem.transition && elem.transition !== 'none' ? 
-                                (isHiding ? 'trans-' + elem.transition + '-out' : 'trans-' + elem.transition) : 
-                                '';
+                            const outTrans = elem.transitionOut && elem.transitionOut !== 'none' ? elem.transitionOut : elem.transition;
+                            const transClass = isHiding ? 
+                                (outTrans && outTrans !== 'none' ? 'trans-' + outTrans + '-out' : '') :
+                                (elem.transition && elem.transition !== 'none' ? 'trans-' + elem.transition : '');
+                            const duringClass = !isHiding && elem.animationDuring && elem.animationDuring !== 'none' ? 'anim-' + elem.animationDuring : '';
+                            const transDur = isHiding ? (elem.transitionOutDuration || elem.transitionDuration || 0.5) : (elem.transitionDuration || 0.5);
                             return e('div', {
                                 key: elem.id,
-                                className: transClass,
+                                className: (transClass + ' ' + duringClass).trim(),
                                 onMouseDown: elem.type === 'draggable' ? (ev) => handleDragStart(ev, elem) : undefined,
                                 style: {
                                     position: 'absolute',
@@ -1441,12 +1898,19 @@
                                     cursor: elem.type === 'draggable' ? (draggedItem?.id === elem.id ? 'grabbing' : 'grab') : (elem.type === 'button' || (elem.type === 'hotspot' && elem.hotspotMode !== 'drop')) ? 'pointer' : 'default',
                                     borderRadius: elem.shape === 'circle' ? '50%' : '0',
                                     opacity: draggedItem?.id === elem.id ? 0.7 : 1,
-                                    animationDuration: (elem.transitionDuration || 0.5) + 's'
+                                    animationDuration: transDur + 's'
                                 },
                                 onClick: () => handleClick(elem)
                             },
-                                elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
-                                elem.type === 'video' && elem.content && e('video', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, playsInline: true, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } }),
+                                elem.type === 'image' && elem.content && e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none', transform: 'scale(' + (elem.flipH ? -1 : 1) + ', ' + (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)', opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100 } }),
+                                elem.type === 'video' && elem.content && e('video', { 
+                                    src: elem.content, 
+                                    autoPlay: elem.autoplay, 
+                                    loop: elem.loop, 
+                                    playsInline: true, 
+                                    onEnded: () => !elem.loop && handleVideoEnd(elem),
+                                    style: { width: '100%', height: '100%', objectFit: 'cover', pointerEvents: 'none' } 
+                                }),
                                 elem.type === 'text' && e('div', { 
                                     className: 'element-text', 
                                     style: { 
@@ -1460,14 +1924,25 @@
                                     } 
                                 }, elem.content),
                                 elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color, color: elem.buttonTextColor || '#ffffff', fontSize: (elem.buttonTextSize || 20) + 'px' } }, elem.content || 'Button'),
-                                elem.type === 'audio' && elem.content && e('audio', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop }),
+                                elem.type === 'audio' && elem.content && e('audio', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, onEnded: () => !elem.loop && handleVideoEnd(elem) }),
                                 elem.type === 'timer' && e('div', { className: 'element-timer' }, activeTimers[elem.id] !== undefined ? activeTimers[elem.id] : elem.countdown),
                                 elem.type === 'draggable' && (
                                     elem.contentType === 'image' && elem.content ? 
                                         e('img', { src: elem.content, style: { width: '100%', height: '100%', objectFit: 'contain', pointerEvents: 'none' } }) :
                                         e('div', { style: { fontSize: elem.fontSize + 'px', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%', pointerEvents: 'none' } }, elem.content || '📦')
                                 ),
-                                elem.type === 'hotspot' && elem.showInGame && e('div', { style: { width: '100%', height: '100%', border: '3px dashed rgba(255,0,0,0.5)', background: 'rgba(255,0,0,0.05)' } })
+                                elem.type === 'hotspot' && elem.showInGame && e('div', { style: { width: '100%', height: '100%', border: '3px dashed rgba(255,0,0,0.5)', background: 'rgba(255,0,0,0.05)' } }),
+                                elem.type === 'object' && e('div', { 
+                                    style: { 
+                                        width: '100%', 
+                                        height: '100%', 
+                                        background: elem.objectColor || elem.color || '#f7931a',
+                                        borderRadius: elem.objectShape === 'circle' ? '50%' : '0',
+                                        clipPath: elem.objectShape === 'triangle' ? 'polygon(50% 0%, 0% 100%, 100% 100%)' : 'none',
+                                        transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)',
+                                        opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100
+                                    }
+                                })
                             );
                         })
                 ),
@@ -1479,11 +1954,44 @@
                         const invItem = inventory.find(i => (i.name || i) === itemName);
                         return !invItem || (typeof invItem === 'string') || invItem.visible;
                     }).map(item => e('div', { key: item, className: 'inventory-item-icon' }, item[0]))
+                ),
+                // Varying items display
+                varyingItems && varyingItems.filter(vi => vi.visible).length > 0 && e('div', { 
+                    className: 'varying-display',
+                    style: {
+                        position: 'fixed',
+                        top: '20px',
+                        left: '20px',
+                        background: 'rgba(0,0,0,0.8)',
+                        padding: '10px',
+                        borderRadius: '8px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '5px',
+                        zIndex: 100
+                    }
+                },
+                    varyingItems.filter(vi => vi.visible).map(vi => 
+                        e('div', { 
+                            key: vi.name, 
+                            style: { 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                color: '#f59e0b',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            } 
+                        },
+                            e('span', { style: { color: '#fff' } }, vi.name + ':'),
+                            e('span', null, playerVaryingValues[vi.name] || 0)
+                        )
+                    )
                 )
             );
         }
 
-        function generateHTML(steps, inventory, options = {}) {
+        function generateHTML(steps, inventory, varyingItems, options = {}) {
             const { includeRefreshButton = false, optimizeVideoLoading = false } = options;
             
             return `<!DOCTYPE html>
@@ -1500,7 +2008,7 @@
         .elem video { pointer-events: none; }
         .elem video::-webkit-media-controls { display: none !important; }
         .elem video::-webkit-media-controls-enclosure { display: none !important; }
-        .elem-text { padding: 15px; border-radius: 6px; text-align: center; }
+        .elem-text { padding: 15px; border-radius: 6px; text-align: center; white-space: pre-wrap; }
         .elem-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
         .elem-timer { background: rgba(247,147,26,0.8); color: #fff; font-size: 3rem; font-weight: 900; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-family: monospace; }
         .elem-draggable { cursor: grab; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: none; }
@@ -1535,18 +2043,40 @@
         @keyframes slideDownOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }
         @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
         @keyframes zoomOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0); opacity: 0; } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes wobble { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); } 20%, 40%, 60%, 80% { transform: translateX(2px); } }
+        @keyframes glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        .anim-pulse { animation: pulse 1s ease-in-out infinite; }
+        .anim-spin { animation: spin 2s linear infinite; }
+        .anim-bounce { animation: bounce 0.5s ease-in-out infinite; }
+        .anim-wobble { animation: wobble 0.5s ease-in-out infinite; }
+        .anim-shake { animation: shake 0.5s ease-in-out infinite; }
+        .anim-glow { animation: glow 1.5s ease-in-out infinite; }
+        .anim-float { animation: float 2s ease-in-out infinite; }
+        .elem-object { display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
     <div id="game" class="canvas"></div>
     <div id="inventory" class="inventory-display" style="display:none"></div>
     ${includeRefreshButton ? '<div class="refresh-button" onclick="refreshCurrentStep()">⟳ Refresh Step</div>' : ''}
+    <div id="varying" style="position:fixed;top:20px;left:20px;background:rgba(0,0,0,0.8);padding:10px;border-radius:8px;display:none;flex-direction:column;gap:5px;z-index:100"></div>
     <script>
-const STEPS = ${JSON.stringify(steps)};
-const INVENTORY_ITEMS = ${JSON.stringify(inventory)};
+// Story data - properly formatted with indentation for readability
+const STORY_DATA = ${JSON.stringify({ steps, inventoryItems: inventory, varyingItems: varyingItems || [] }, null, 2)};
+
+const STEPS = STORY_DATA.steps;
+const INVENTORY_ITEMS = STORY_DATA.inventoryItems;
+const VARYING_ITEMS = STORY_DATA.varyingItems;
+
 let current = STEPS[0].id;
 let visible = {};
 let inventory = [];
+let varyingValues = {};
 let timers = [];
 let timerCountdowns = {};
 let hiding = {};
@@ -1662,20 +2192,6 @@ function render() {
     });
     
     fullDraw();
-    
-    setTimeout(() => {
-        const vids = document.querySelectorAll("video");
-        vids.forEach(v => {
-            const elem = s.elements.find(e => e.content && v.src.includes(e.content));
-            if (elem) {
-                v.onended = () => {
-                    s.events.forEach(ev => {
-                        if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === elem.id && checkCond(ev.condition)) exec(ev.actions);
-                    });
-                };
-            }
-        });
-    }, 100);
 }
 
 function startTimer(id, countdown) {
@@ -1713,16 +2229,19 @@ function hideElem(id) {
     if (audio) { audio.pause(); audio.currentTime = 0; }
     if (video) { video.pause(); video.currentTime = 0; }
     
-    if (elem && elem.transition && elem.transition !== "none") {
+    const outTrans = elem && elem.transitionOut && elem.transitionOut !== "none" ? elem.transitionOut : (elem ? elem.transition : "none");
+    const outDur = elem && elem.transitionOut && elem.transitionOut !== "none" ? (elem.transitionOutDuration || 0.5) : (elem ? (elem.transitionDuration || 0.5) : 0.5);
+    
+    if (outTrans && outTrans !== "none") {
         hiding[id] = true;
-        elemDiv.className = elemDiv.className.replace(/\\btrans-[\\w-]+\\b/g, '').trim() + ' trans-' + elem.transition + '-out';
-        elemDiv.style.animationDuration = (elem.transitionDuration || 0.5) + 's';
+        elemDiv.className = elemDiv.className.replace(/\\btrans-[\\w-]+\\b/g, '').replace(/\\banim-[\\w-]+\\b/g, '').trim() + ' trans-' + outTrans + '-out';
+        elemDiv.style.animationDuration = outDur + 's';
         setTimeout(() => {
             visible[id] = false;
             hiding[id] = false;
             delete rendered[id];
             if (elemDiv.parentNode) elemDiv.remove();
-        }, (elem.transitionDuration || 0.5) * 1000);
+        }, outDur * 1000);
     } else {
         visible[id] = false;
         delete rendered[id];
@@ -1749,6 +2268,9 @@ function checkCond(c) {
     if (!c) return true;
     if (c.type === "hasItem") return inventory.includes(c.item);
     if (c.type === "notHasItem") return !inventory.includes(c.item);
+    if (c.type === "varyingAtLeast") return (varyingValues[c.item] || 0) >= (c.amount || 0);
+    if (c.type === "varyingAtMost") return (varyingValues[c.item] || 0) <= (c.amount || 0);
+    if (c.type === "varyingBetween") return (varyingValues[c.item] || 0) >= (c.min || 0) && (varyingValues[c.item] || 0) <= (c.max || 0);
     return true;
 }
 
@@ -1769,30 +2291,55 @@ function exec(acts) {
             return;
         } else if (a.type === "addItem" && !inventory.includes(a.target)) inventory.push(a.target);
         else if (a.type === "removeItem") inventory = inventory.filter(x => x !== a.target);
+        else if (a.type === "addVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) + (a.amount || 0);
+        else if (a.type === "subtractVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) - (a.amount || 0);
     });
     updateInventory();
 }
 
+function hexToRgba(hex, opacity) {
+    if (!hex || hex.startsWith('rgba')) return hex || 'rgba(0,0,0,' + opacity + ')';
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + opacity + ')';
+}
+
 function createElemHTML(e, withTransition) {
     const isHiding = hiding[e.id];
-    const transClass = withTransition && e.transition && e.transition !== "none" && !isHiding ? " trans-" + e.transition : (isHiding ? " trans-" + e.transition + "-out" : "");
-    const transDur = e.transitionDuration || 0.5;
-    const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s";
+    const outTrans = e.transitionOut && e.transitionOut !== "none" ? e.transitionOut : e.transition;
+    const transClass = withTransition && e.transition && e.transition !== "none" && !isHiding ? " trans-" + e.transition : (isHiding && outTrans && outTrans !== "none" ? " trans-" + outTrans + "-out" : "");
+    const duringClass = e.animationDuring && e.animationDuring !== "none" && !isHiding ? " anim-" + e.animationDuring : "";
+    const transDur = isHiding ? (e.transitionOutDuration || e.transitionDuration || 0.5) : (e.transitionDuration || 0.5);
+    const flipScaleX = e.flipH ? -1 : 1;
+    const flipScaleY = e.flipV ? -1 : 1;
+    const rotation = e.rotation || 0;
+    const objectOpacity = (e.opacity !== undefined ? e.opacity : 100) / 100;
+    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg);opacity:" + objectOpacity : "";
+    const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s" + objectStyle;
     const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \\'' + e.id + '\\')" ontouchstart="handleDragStart(event, \\'' + e.id + '\\')"' : "";
     const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\\'' + e.id + '\\')"' : "";
     const hotspotClass = (e.type === "hotspot" && e.showInGame) ? " elem-hotspot-visible" : "";
+    const objectClass = e.type === "object" ? " elem-object" : "";
+    const imgTransform = (e.flipH || e.flipV || rotation) ? "transform:scale(" + flipScaleX + "," + flipScaleY + ") rotate(" + rotation + "deg);" : "";
     
-    let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + transClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
-    if (e.type === "image" && e.content) h += '<img src="' + e.content + '">';
-    if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (OPTIMIZE_VIDEO ? 'preload="metadata" ' : '') + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></video>';
-    if (e.type === "text") h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + (e.textBgColor || "rgba(0,0,0,0.8)") + '">' + e.content + '</div>';
+    let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + objectClass + transClass + duringClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
+    if (e.type === "image" && e.content) h += '<img src="' + e.content + '" style="' + imgTransform + 'opacity:' + ((e.opacity !== undefined ? e.opacity : 100) / 100) + ';">';
+    if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (OPTIMIZE_VIDEO ? 'preload="metadata" ' : '') + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\\'' + e.id + '\\')" data-video-id="' + e.id + '"><source src="' + e.content + '"></video>';
+    if (e.type === "text") {
+        const bgOpacity = e.textBgOpacity !== undefined ? e.textBgOpacity : 0.8;
+        const bgColor = hexToRgba(e.textBgColor || '#000000', bgOpacity);
+        h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + bgColor + '">' + e.content + '</div>';
+    }
     if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px">' + (e.content || "Button") + '</div>';
-    if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop' : '') + '><source src="' + e.content + '"></audio>';
+    if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\\'' + e.id + '\\')"><source src="' + e.content + '"></audio>';
     if (e.type === "timer") h += '<div class="elem-timer">' + (timerCountdowns[e.id] !== undefined ? timerCountdowns[e.id] : e.countdown) + '</div>';
     if (e.type === "draggable") {
         if (e.contentType === "image" && e.content) h += '<img src="' + e.content + '">';
         else h += '<div style="font-size:' + e.fontSize + 'px;color:#fff;pointer-events:none">' + (e.content || "📦") + '</div>';
     }
+    if (e.type === "object") h += '';
     h += '</div>';
     return h;
 }
@@ -1851,6 +2398,23 @@ function updateInventory() {
         inv.innerHTML = visInv.map(x => '<div style="width:40px;height:40px;background:#f7931a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px">' + x[0] + '</div>').join("");
     } else {
         inv.style.display = "none";
+    }
+    updateVarying();
+}
+
+function updateVarying() {
+    const vd = document.getElementById("varying");
+    const visVarying = VARYING_ITEMS.filter(vi => vi.visible);
+    if (visVarying.length > 0) {
+        vd.style.display = "flex";
+        vd.innerHTML = visVarying.map(vi => 
+            '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold">' +
+            '<span style="color:#fff">' + vi.name + ':</span>' +
+            '<span>' + (varyingValues[vi.name] || 0) + '</span>' +
+            '</div>'
+        ).join("");
+    } else {
+        vd.style.display = "none";
     }
 }
 
@@ -1924,6 +2488,13 @@ function handleDragEnd(ev) {
         draggedDiv.style.top = draggedElem.y + 'px';
     }
     draggedElem = null;
+}
+
+function handleVideoEnd(id) {
+    const s = STEPS.find(x => x.id === current);
+    s.events.forEach(ev => {
+        if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === id && checkCond(ev.condition)) exec(ev.actions);
+    });
 }
 
 let lastClickTime = 0;
