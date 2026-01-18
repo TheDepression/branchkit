@@ -133,6 +133,16 @@
         .anim-shake { animation: shake 0.5s ease-in-out infinite; }
         .anim-glow { animation: glow 1.5s ease-in-out infinite; }
         .anim-float { animation: float 2s ease-in-out infinite; }
+        @keyframes buttonPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(247,147,26,0.4); } 50% { transform: scale(1.02); box-shadow: 0 0 10px 3px rgba(247,147,26,0.3); } }
+        .anim-buttonPulse { animation: buttonPulse 1.5s ease-in-out infinite; }
+        .element-embed { background: rgba(128,0,255,0.2); border: 2px dashed #8800ff; display: flex; align-items: center; justify-content: center; font-size: 1rem; color: #8800ff; flex-direction: column; }
+        .folder-item { background: #1a2040; border: 2px solid #4a5568; border-radius: 6px; margin-bottom: 5px; }
+        .folder-header { display: flex; align-items: center; gap: 6px; padding: 6px; cursor: pointer; font-size: 0.75rem; }
+        .folder-header:hover { background: #252b55; border-radius: 4px; }
+        .folder-content { padding-left: 10px; border-left: 2px solid #4a5568; margin-left: 10px; }
+        .folder-content.collapsed { display: none; }
+        .folder-color-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+        .embed-close-btn { position: absolute; bottom: 10px; right: 10px; width: 30px; height: 30px; background: #ef4444; border: none; border-radius: 50%; color: white; font-size: 16px; cursor: pointer; z-index: 10001; display: flex; align-items: center; justify-content: center; }
     </style>
 </head>
 <body>
@@ -144,20 +154,24 @@
             return name.replace(/[^a-zA-Z0-9_-]/g, '_');
         }
 
-        function generateUniqueStepId(title, existingSteps) {
-            let base = sanitizeStepName(title) || 'step';
-            let id = base;
-            let counter = 2;
-            while (existingSteps.some(s => s.id === id)) {
-                id = base + counter;
-                counter++;
-            }
-            return id;
+        // Generate a stable unique ID that never changes even when title changes
+        function generateStableId() {
+            return 'step_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         }
 
         function createStep(title, existingSteps) {
-            const id = generateUniqueStepId(title, existingSteps);
-            return { id, title, elements: [], events: [], password: '', wrongPasswordStep: '', bgColor: '#000000', bgShapes: [] };
+            const id = generateStableId();
+            return { id, title, elements: [], events: [], password: '', wrongPasswordStep: '', bgColor: '#000000', bgShapes: [], folderId: null };
+        }
+
+        function createFolder(name) {
+            return {
+                id: 'folder_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                name: name,
+                color: '#4a5568',
+                parentId: null,
+                collapsed: false
+            };
         }
 
         // Stable ID generation system
@@ -182,8 +196,8 @@
                 label: type + '1',
                 x: 100,
                 y: 100,
-                width: type === 'text' || type === 'button' ? 300 : type === 'audio' ? 200 : type === 'timer' ? 150 : type === 'draggable' ? 100 : type === 'object' ? 100 : 400,
-                height: type === 'text' ? 100 : type === 'button' ? 60 : type === 'audio' ? 60 : type === 'timer' ? 150 : type === 'draggable' ? 100 : type === 'object' ? 100 : 300,
+                width: type === 'text' || type === 'button' ? 300 : type === 'audio' ? 200 : type === 'timer' ? 150 : type === 'draggable' ? 100 : type === 'object' ? 100 : type === 'embed' ? 400 : 400,
+                height: type === 'text' ? 100 : type === 'button' ? 60 : type === 'audio' ? 60 : type === 'timer' ? 150 : type === 'draggable' ? 100 : type === 'object' ? 100 : type === 'embed' ? 300 : 300,
                 content: '',
                 visible: true,
                 layer: 0,
@@ -206,6 +220,8 @@
                 textSize: 24,
                 buttonTextColor: '#ffffff',
                 buttonTextSize: 20,
+                buttonShadow: false,
+                buttonPulse: false,
                 objectShape: 'rect',
                 objectColor: '#f7931a',
                 scaleX: 1,
@@ -214,7 +230,11 @@
                 flipH: false,
                 flipV: false,
                 opacity: 100,
-                textBgOpacity: 80
+                textBgOpacity: 80,
+                embedUrl: '',
+                embedAllowNavigation: false,
+                embedThumbnail: '',
+                embedCloseDelay: 0
             };
         }
 
@@ -232,7 +252,18 @@
             const savedData = localStorage.getItem('storyBuilderAutosave');
             const initialData = savedData ? JSON.parse(savedData) : null;
             
-            const [steps, setSteps] = useState(initialData?.steps || []);
+            // Migration: ensure steps have stable IDs
+            const migrateSteps = (steps) => {
+                if (!steps) return [];
+                return steps.map(step => {
+                    if (!step.id || !step.id.startsWith('step_')) {
+                        return { ...step, id: generateStableId(), folderId: step.folderId || null };
+                    }
+                    return { ...step, folderId: step.folderId || null };
+                });
+            };
+            
+            const [steps, setSteps] = useState(migrateSteps(initialData?.steps) || []);
             const [currentStepId, setCurrentStepId] = useState(initialData?.currentStepId || null);
             const [selectedElementId, setSelectedElementId] = useState(null);
             const [activeTab, setActiveTab] = useState('elements');
@@ -252,38 +283,58 @@
             const [inventory, setInventory] = useState(initialData?.inventory || []);
             const [draggedInPlay, setDraggedInPlay] = useState(null);
             const [lastSaved, setLastSaved] = useState(null);
+            const [folders, setFolders] = useState(initialData?.folders || []);
+            const [collapsedFolders, setCollapsedFolders] = useState({});
+            const [dragOverFolderId, setDragOverFolderId] = useState(null);
+            const [bgmSettings, setBgmSettings] = useState(initialData?.bgmSettings || { url: '', loop: true, volume: 100 });
+            const [inventorySettings, setInventorySettings] = useState(initialData?.inventorySettings || { 
+                position: 'bottom-left', 
+                x: 20, 
+                y: 20,
+                showInventory: true,
+                showVarying: true
+            });
             const [exportOptions, setExportOptions] = useState({
                 includeRefreshButton: false,
-                optimizeVideoLoading: false
+                optimizeVideoLoading: false,
+                compactLandscape: false
             });
+            const [previewOnTop, setPreviewOnTop] = useState(false);
+            const [savedUrls, setSavedUrls] = useState(initialData?.savedUrls || []);
+            const [canvasMode, setCanvasMode] = useState(initialData?.canvasMode || 'landscape');
+            const [saveKey, setSaveKey] = useState(initialData?.saveKey || '');
             const canvasRef = useRef(null);
+            
+            // Canvas dimensions based on mode
+            const canvasWidth = canvasMode === 'portrait' ? 576 : 1024;
+            const canvasHeight = canvasMode === 'portrait' ? 1024 : 576;
 
             useEffect(() => {
                 const updateScale = () => {
                     if (canvasRef.current) {
                         const container = canvasRef.current.parentElement;
-                        const scaleX = (container.clientWidth - 40) / 1024;
-                        const scaleY = (container.clientHeight - 40) / 576;
+                        const scaleX = (container.clientWidth - 40) / canvasWidth;
+                        const scaleY = (container.clientHeight - 40) / canvasHeight;
                         setScale(Math.min(scaleX, scaleY, 1));
                     }
                 };
                 updateScale();
                 window.addEventListener('resize', updateScale);
                 return () => window.removeEventListener('resize', updateScale);
-            }, []);
+            }, [canvasMode]);
 
             // Autosave to localStorage every 5 seconds when there are changes
             useEffect(() => {
                 if (steps.length === 0 && inventory.length === 0 && varyingItems.length === 0) return;
                 
                 const autosaveTimer = setTimeout(() => {
-                    const data = { steps, inventory, varyingItems, currentStepId };
+                    const data = { steps, inventory, varyingItems, currentStepId, folders, bgmSettings, inventorySettings, savedUrls, canvasMode, saveKey };
                     localStorage.setItem('storyBuilderAutosave', JSON.stringify(data));
                     setLastSaved(new Date().toLocaleTimeString());
                 }, 2000);
                 
                 return () => clearTimeout(autosaveTimer);
-            }, [steps, inventory, varyingItems, currentStepId]);
+            }, [steps, inventory, varyingItems, currentStepId, folders, bgmSettings, inventorySettings]);
 
             const getCurrentStep = () => steps.find(s => s.id === currentStepId);
             const getSelectedElement = () => {
@@ -294,15 +345,8 @@
             const updateStep = (updates) => {
                 setSteps(steps.map(s => {
                     if (s.id === currentStepId) {
-                        const updated = { ...s, ...updates };
-                        if (updates.title && updates.title !== s.title) {
-                            const newId = generateUniqueStepId(updates.title, steps.filter(st => st.id !== s.id));
-                            if (newId !== s.id) {
-                                updated.id = newId;
-                                setCurrentStepId(newId);
-                            }
-                        }
-                        return updated;
+                        // ID never changes - title is just a display name
+                        return { ...s, ...updates };
                     }
                     return s;
                 }));
@@ -340,6 +384,69 @@
                 const step = createStep(title, steps);
                 setSteps([...steps, step]);
                 setCurrentStepId(step.id);
+            };
+
+            const createNewFolder = () => {
+                const name = prompt('Folder name:');
+                if (!name) return;
+                const folder = createFolder(name);
+                setFolders([...folders, folder]);
+            };
+
+            const deleteFolder = (folderId) => {
+                const folder = folders.find(f => f.id === folderId);
+                const stepsInFolder = steps.filter(s => s.folderId === folderId);
+                const subFolders = folders.filter(f => f.parentId === folderId);
+                
+                if (stepsInFolder.length > 0 || subFolders.length > 0) {
+                    const choice = prompt('Folder "' + folder.name + '" contains ' + stepsInFolder.length + ' step(s) and ' + subFolders.length + ' subfolder(s).\n\nType:\n  "keep" - delete folder, keep contents\n  "delete" - delete folder and all contents\n  Or press Cancel to abort');
+                    
+                    if (choice === null) return; // User pressed Cancel
+                    
+                    if (choice.toLowerCase() === 'keep') {
+                        setSteps(steps.map(s => s.folderId === folderId ? { ...s, folderId: folder.parentId } : s));
+                        setFolders(folders.filter(f => f.id !== folderId).map(f => f.parentId === folderId ? { ...f, parentId: folder.parentId } : f));
+                    } else if (choice.toLowerCase() === 'delete') {
+                        const getAllSubFolderIds = (parentId) => {
+                            const subIds = folders.filter(f => f.parentId === parentId).map(f => f.id);
+                            return subIds.concat(subIds.flatMap(id => getAllSubFolderIds(id)));
+                        };
+                        const allFolderIds = [folderId, ...getAllSubFolderIds(folderId)];
+                        
+                        setSteps(steps.filter(s => !allFolderIds.includes(s.folderId)));
+                        setFolders(folders.filter(f => !allFolderIds.includes(f.id)));
+                    }
+                    // Any other input = do nothing (abort)
+                } else {
+                    if (confirm('Delete empty folder "' + folder.name + '"?')) {
+                        setFolders(folders.filter(f => f.id !== folderId));
+                    }
+                }
+            };
+
+            const renameFolder = (folderId) => {
+                const folder = folders.find(f => f.id === folderId);
+                const newName = prompt('Rename folder:', folder.name);
+                if (newName && newName !== folder.name) {
+                    setFolders(folders.map(f => f.id === folderId ? { ...f, name: newName } : f));
+                }
+            };
+
+            const handleFolderDrop = (e, folderId) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (draggedStepId) {
+                    // Don't allow first step to be in folder
+                    if (steps[0]?.id === draggedStepId && folderId !== null) {
+                        alert('The first step must remain at the top level and cannot be moved to a folder.');
+                        setDraggedStepId(null);
+                        setDragOverFolderId(null);
+                        return;
+                    }
+                    setSteps(steps.map(s => s.id === draggedStepId ? { ...s, folderId } : s));
+                }
+                setDraggedStepId(null);
+                setDragOverFolderId(null);
             };
 
             const handleStepDragStart = (e, stepId) => {
@@ -401,13 +508,14 @@
 
             const addInventoryItem = () => {
                 const name = prompt('Inventory item name:');
-                if (name && !inventory.find(i => i.name === name)) {
-                    setInventory([...inventory, { name: name, visible: true }]);
+                if (name && !inventory.find(i => (i.name || i) === name)) {
+                    setInventory([...inventory, { name: name, visible: true, displayName: name }]);
                 }
             };
 
             const deleteInventoryItem = (item) => {
-                setInventory(inventory.filter(i => i.name !== item.name));
+                const itemName = item.name || item;
+                setInventory(inventory.filter(i => (i.name || i) !== itemName));
             };
 
             const addVaryingItem = () => {
@@ -640,12 +748,15 @@
                 setSelectedElementId(null);
                 setInventory([]);
                 setVaryingItems([]);
+                setFolders([]);
+                setBgmSettings({ url: '', loop: true, volume: 100 });
+                setInventorySettings({ position: 'bottom-left', x: 20, y: 20, showInventory: true, showVarying: true });
                 localStorage.removeItem('storyBuilderAutosave');
                 setLastSaved(null);
             };
 
             const saveProject = () => {
-                const data = JSON.stringify({ steps, inventory, varyingItems }, null, 2);
+                const data = JSON.stringify({ steps, inventory, varyingItems, folders, bgmSettings, inventorySettings, savedUrls, canvasMode, saveKey }, null, 2);
                 const blob = new Blob([data], { type: 'application/json' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
@@ -665,24 +776,36 @@
                         try {
                             const data = JSON.parse(e.target.result);
                             
+                            // Migration: add stable IDs to old steps and ensure folderId exists
+                            const migratedSteps = data.steps.map(step => {
+                                const migrated = { ...step };
+                                if (!step.id || !step.id.startsWith('step_')) {
+                                    migrated.id = generateStableId();
+                                }
+                                if (migrated.folderId === undefined) {
+                                    migrated.folderId = null;
+                                }
+                                return migrated;
+                            });
+                            
                             // Validate: Find broken event references
                             const brokenRefs = [];
-                            data.steps.forEach(step => {
+                            migratedSteps.forEach(step => {
                                 const elementIds = step.elements.map(el => el.id);
                                 step.events.forEach(ev => {
                                     // Check trigger source element
                                     if (ev.trigger.sourceElement && !elementIds.includes(ev.trigger.sourceElement)) {
                                         brokenRefs.push({
                                             step: step.title,
-                                            issue: `Event trigger references missing element: ${ev.trigger.sourceElement}`
+                                            issue: 'Event trigger references missing element: ' + ev.trigger.sourceElement
                                         });
                                     }
                                     // Check action targets
                                     ev.actions.forEach(action => {
-                                        if (action.target && !elementIds.includes(action.target) && action.type !== 'goto' && action.type !== 'inventory' && action.type !== 'password' && action.type !== 'addItem' && action.type !== 'removeItem') {
+                                        if (action.target && !elementIds.includes(action.target) && action.type !== 'goto' && action.type !== 'inventory' && action.type !== 'password' && action.type !== 'addItem' && action.type !== 'removeItem' && action.type !== 'bgmPlay' && action.type !== 'bgmStop' && action.type !== 'showInventory' && action.type !== 'hideInventory' && action.type !== 'showVarying' && action.type !== 'hideVarying') {
                                             brokenRefs.push({
                                                 step: step.title,
-                                                issue: `Event action references missing element: ${action.target}`
+                                                issue: 'Event action references missing element: ' + action.target
                                             });
                                         }
                                     });
@@ -692,8 +815,8 @@
                             // If broken references found, warn user
                             if (brokenRefs.length > 0) {
                                 const msg = 'WARNING: Found events referencing missing elements:\n\n' + 
-                                    brokenRefs.slice(0, 10).map(r => `• ${r.step}: ${r.issue}`).join('\n') +
-                                    (brokenRefs.length > 10 ? `\n\n...and ${brokenRefs.length - 10} more issues` : '') +
+                                    brokenRefs.slice(0, 10).map(r => '• ' + r.step + ': ' + r.issue).join('\n') +
+                                    (brokenRefs.length > 10 ? '\n\n...and ' + (brokenRefs.length - 10) + ' more issues' : '') +
                                     '\n\nThese broken events may cause buttons to not work.\n\nOptions:\n' +
                                     '- Click OK to load anyway (you can manually fix broken events)\n' +
                                     '- Click Cancel to abort import';
@@ -703,10 +826,30 @@
                                 }
                             }
                             
-                            setSteps(data.steps);
-                            setInventory(data.inventory || []);
-                            setVaryingItems(data.varyingItems || []);
-                            setCurrentStepId(data.steps[0]?.id);
+                            // Migrate inventory items to new format with displayName
+                            const migratedInventory = (data.inventory || []).map(item => {
+                                if (typeof item === 'string') {
+                                    return { name: item, visible: true, displayName: item };
+                                }
+                                return { ...item, displayName: item.displayName || item.name };
+                            });
+                            
+                            // Migrate varying items
+                            const migratedVarying = (data.varyingItems || []).map(item => ({
+                                ...item,
+                                displayName: item.displayName || item.name
+                            }));
+                            
+                            setSteps(migratedSteps);
+                            setInventory(migratedInventory);
+                            setVaryingItems(migratedVarying);
+                            setFolders(data.folders || []);
+                            setBgmSettings(data.bgmSettings || { url: '', loop: true, volume: 100 });
+                            setInventorySettings(data.inventorySettings || { position: 'bottom-left', x: 20, y: 20, showInventory: true, showVarying: true });
+                            setSavedUrls(data.savedUrls || []);
+                            setCanvasMode(data.canvasMode || 'landscape');
+                            setSaveKey(data.saveKey || '');
+                            setCurrentStepId(migratedSteps[0]?.id);
                             alert(brokenRefs.length > 0 ? 'Loaded with warnings! Check events on steps with issues.' : 'Loaded successfully!');
                         } catch (err) {
                             alert('Error: ' + err.message);
@@ -776,7 +919,7 @@
 
 
             const exportHTML = () => {
-                const html = generateHTML(steps, inventory, varyingItems, exportOptions);
+                const html = generateHTML(steps, inventory, varyingItems, exportOptions, bgmSettings, inventorySettings, canvasMode, saveKey);
                 navigator.clipboard.writeText(html).then(() => {
                     alert('✅ HTML copied!');
                 }).catch(() => {
@@ -791,11 +934,75 @@
             };
 
             if (playMode) {
-                return e(PlayMode, { steps, inventory, varyingItems, onExit: () => setPlayMode(false), startStepId: playStartStep || currentStepId });
+                return e(PlayMode, { steps, inventory, varyingItems, onExit: () => setPlayMode(false), startStepId: playStartStep || currentStepId, bgmSettings, inventorySettings });
             }
 
             const currentStep = getCurrentStep();
             const selectedElement = getSelectedElement();
+
+            // Helper function to render a step item
+            const renderStepItem = (step, isFirst = false) => {
+                const actualFirst = steps[0]?.id === step.id;
+                return e('div', {
+                    key: step.id,
+                    className: 'step-item' + (step.id === currentStepId ? ' active' : '') + (step.id === dragOverStepId ? ' drag-over' : ''),
+                    draggable: !actualFirst,
+                    onDragStart: actualFirst ? undefined : (ev) => handleStepDragStart(ev, step.id),
+                    onDragOver: (ev) => handleStepDragOver(ev, step.id),
+                    onDrop: (ev) => handleStepDrop(ev, step.id),
+                    onDragEnd: handleStepDragEnd,
+                    style: { opacity: step.id === draggedStepId ? 0.5 : 1 }
+                },
+                    e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
+                        e('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1 } },
+                            !actualFirst && e('div', { style: { cursor: 'grab', fontSize: '12px', opacity: 0.5 } }, '☰'),
+                            actualFirst && e('div', { style: { fontSize: '12px' } }, '🏠'),
+                            e('div', { className: 'step-title', onClick: () => { setCurrentStepId(step.id); setSelectedElementId(null); }, style: { flex: 1, cursor: 'pointer' } }, step.title)
+                        ),
+                        e('div', { style: { display: 'flex', gap: '3px' } },
+                            e('button', { 
+                                className: 'btn btn-secondary btn-small', 
+                                onClick: (ev) => {
+                                    ev.stopPropagation();
+                                    setPlayStartStep(step.id);
+                                    setPlayMode(true);
+                                },
+                                style: { padding: '2px 4px', fontSize: '10px' },
+                                title: 'Play from here'
+                            }, '▶'),
+                            e('button', { 
+                                className: 'btn btn-success btn-small', 
+                                onClick: (ev) => {
+                                    ev.stopPropagation();
+                                    const clonedStep = JSON.parse(JSON.stringify(step));
+                                    clonedStep.id = generateStableId();
+                                    clonedStep.title = step.title + ' 2';
+                                    clonedStep.folderId = step.folderId;
+                                    const insertIndex = steps.findIndex(s => s.id === step.id) + 1;
+                                    setSteps([...steps.slice(0, insertIndex), clonedStep, ...steps.slice(insertIndex)]);
+                                },
+                                style: { padding: '2px 4px', fontSize: '10px' },
+                                title: 'Duplicate'
+                            }, '📋'),
+                            !actualFirst && e('button', { 
+                                className: 'btn btn-danger btn-small', 
+                                onClick: (ev) => {
+                                    ev.stopPropagation();
+                                    if (confirm('Delete "' + step.title + '"?')) {
+                                        const newSteps = steps.filter(s => s.id !== step.id);
+                                        setSteps(newSteps);
+                                        if (currentStepId === step.id) {
+                                            setCurrentStepId(newSteps[0]?.id);
+                                        }
+                                    }
+                                },
+                                style: { padding: '2px 4px', fontSize: '10px' },
+                                title: 'Delete'
+                            }, '×')
+                        )
+                    )
+                );
+            };
 
             return e('div', { className: 'app' },
                 e('header', { className: 'header' },
@@ -818,7 +1025,15 @@
                                 checked: exportOptions.optimizeVideoLoading,
                                 onChange: (ev) => setExportOptions({ ...exportOptions, optimizeVideoLoading: ev.target.checked })
                             }),
-                            '📹 Optimize Videos'
+                            '📦 Compress'
+                        ),
+                        e('label', { style: { display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer', whiteSpace: 'nowrap' } },
+                            e('input', { 
+                                type: 'checkbox', 
+                                checked: exportOptions.compactLandscape,
+                                onChange: (ev) => setExportOptions({ ...exportOptions, compactLandscape: ev.target.checked })
+                            }),
+                            '📱 85% Landscape'
                         )
                     ),
                     e('div', { className: 'header-buttons' },
@@ -846,82 +1061,94 @@
                 
                 e('aside', { className: 'sidebar' },
                     e('div', { className: 'section-title' }, 'Steps'),
-                    e('button', { className: 'btn btn-primary btn-small', style: { width: '100%', marginBottom: '6px' }, onClick: createNewStep }, '+ Step'),
-                    steps.map(step =>
-                        e('div', {
-                            key: step.id,
-                            className: 'step-item' + (step.id === currentStepId ? ' active' : '') + (step.id === dragOverStepId ? ' drag-over' : ''),
-                            draggable: true,
-                            onDragStart: (ev) => handleStepDragStart(ev, step.id),
-                            onDragOver: (ev) => handleStepDragOver(ev, step.id),
-                            onDrop: (ev) => handleStepDrop(ev, step.id),
-                            onDragEnd: handleStepDragEnd,
-                            style: { opacity: step.id === draggedStepId ? 0.5 : 1 }
+                    e('div', { style: { display: 'flex', gap: '3px', marginBottom: '6px' } },
+                        e('button', { className: 'btn btn-primary btn-small', style: { flex: 1 }, onClick: createNewStep }, '+ Step'),
+                        e('button', { className: 'btn btn-secondary btn-small', onClick: createNewFolder, title: 'New Folder' }, '📁')
+                    ),
+                    // Root drop area (drag steps here to remove from folder)
+                    e('div', {
+                        style: { 
+                            minHeight: draggedStepId ? '30px' : '10px',
+                            background: dragOverFolderId === 'root' ? 'rgba(16, 185, 129, 0.3)' : (draggedStepId ? 'rgba(255,255,255,0.05)' : 'transparent'),
+                            borderRadius: '4px',
+                            marginBottom: '5px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.6rem',
+                            color: '#6b7280',
+                            border: draggedStepId ? '1px dashed #4a5568' : 'none'
                         },
-                            e('div', { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } },
-                                e('div', { style: { display: 'flex', alignItems: 'center', gap: '6px', flex: 1 } },
-                                    e('div', { style: { cursor: 'grab', fontSize: '12px', opacity: 0.5 } }, '☰'),
-                                    e('div', { className: 'step-title', onClick: () => setCurrentStepId(step.id), style: { flex: 1, cursor: 'pointer' } }, step.title)
+                        onDragOver: (ev) => { ev.preventDefault(); setDragOverFolderId('root'); },
+                        onDragLeave: () => setDragOverFolderId(null),
+                        onDrop: (ev) => handleFolderDrop(ev, null)
+                    }, draggedStepId ? '↑ Drop here to remove from folder' : null),
+                    // Render folders
+                    folders.filter(f => !f.parentId).map(folder => {
+                        const stepsInFolder = steps.filter(s => s.folderId === folder.id);
+                        const isCollapsed = collapsedFolders[folder.id];
+                        return e('div', { 
+                            key: folder.id, 
+                            className: 'folder-item',
+                            style: { borderColor: folder.color }
+                        },
+                            e('div', { 
+                                className: 'folder-header',
+                                style: { background: dragOverFolderId === folder.id ? 'rgba(16, 185, 129, 0.2)' : 'transparent' },
+                                onDragOver: (ev) => { ev.preventDefault(); setDragOverFolderId(folder.id); },
+                                onDragLeave: () => setDragOverFolderId(null),
+                                onDrop: (ev) => handleFolderDrop(ev, folder.id)
+                            },
+                                e('span', { 
+                                    className: 'folder-color-dot',
+                                    style: { background: folder.color }
+                                }),
+                                e('span', { 
+                                    style: { flex: 1, cursor: 'pointer' },
+                                    onClick: () => setCollapsedFolders({ ...collapsedFolders, [folder.id]: !isCollapsed })
+                                }, 
+                                    (isCollapsed ? '▶ ' : '▼ ') + folder.name + ' (' + stepsInFolder.length + ')'
                                 ),
-                                e('div', { style: { display: 'flex', gap: '3px' } },
-                                    e('button', { 
-                                        className: 'btn btn-secondary btn-small', 
-                                        onClick: (ev) => {
-                                            ev.stopPropagation();
-                                            const newTitle = prompt('Rename step:', step.title);
-                                            if (newTitle && newTitle !== step.title) {
-                                                setSteps(steps.map(s => s.id === step.id ? { ...s, title: newTitle } : s));
-                                            }
-                                        },
-                                        style: { padding: '2px 4px', fontSize: '10px' }
-                                    }, '✏️'),
-                                    e('button', { 
-                                        className: 'btn btn-success btn-small', 
-                                        onClick: (ev) => {
-                                            ev.stopPropagation();
-                                            const clonedStep = JSON.parse(JSON.stringify(step));
-                                            clonedStep.id = step.id + '_2';
-                                            clonedStep.title = step.title + ' 2';
-                                            const insertIndex = steps.findIndex(s => s.id === step.id) + 1;
-                                            setSteps([...steps.slice(0, insertIndex), clonedStep, ...steps.slice(insertIndex)]);
-                                        },
-                                        style: { padding: '2px 4px', fontSize: '10px' }
-                                    }, '📋'),
-                                    e('button', { 
-                                        className: 'btn btn-danger btn-small', 
-                                        onClick: (ev) => {
-                                            ev.stopPropagation();
-                                            if (steps.length === 1) {
-                                                alert('Cannot delete the last step!');
-                                                return;
-                                            }
-                                            if (confirm('Delete "' + step.title + '"?')) {
-                                                const newSteps = steps.filter(s => s.id !== step.id);
-                                                setSteps(newSteps);
-                                                if (currentStepId === step.id) {
-                                                    setCurrentStepId(newSteps[0].id);
-                                                }
-                                            }
-                                        },
-                                        style: { padding: '2px 4px', fontSize: '10px' }
-                                    }, '×')
-                                )
+                                e('input', {
+                                    type: 'color',
+                                    value: folder.color,
+                                    onChange: (ev) => setFolders(folders.map(f => f.id === folder.id ? { ...f, color: ev.target.value } : f)),
+                                    style: { width: '18px', height: '18px', padding: 0, border: 'none', cursor: 'pointer' },
+                                    onClick: (ev) => ev.stopPropagation()
+                                }),
+                                e('button', { 
+                                    className: 'btn btn-secondary btn-small',
+                                    style: { padding: '2px 4px', fontSize: '10px' },
+                                    onClick: (ev) => { ev.stopPropagation(); renameFolder(folder.id); },
+                                    title: 'Rename folder'
+                                }, '✏️'),
+                                e('button', { 
+                                    className: 'btn btn-danger btn-small',
+                                    style: { padding: '2px 4px', fontSize: '10px' },
+                                    onClick: (ev) => { ev.stopPropagation(); deleteFolder(folder.id); },
+                                    title: 'Delete folder'
+                                }, '×')
+                            ),
+                            !isCollapsed && e('div', { className: 'folder-content' },
+                                stepsInFolder.map(step => renderStepItem(step))
                             )
-                        )
-                    )
+                        );
+                    }),
+                    // Steps without folder (except first step which is handled specially)
+                    steps.filter(s => !s.folderId).map((step, idx) => renderStepItem(step, idx === 0))
                 ),
 
                 e('main', { className: 'canvas' },
                     e('div', { ref: canvasRef, className: 'preview-container', style: { transform: 'scale(' + scale + ')' } },
-                        e('div', { className: 'preview', style: { background: currentStep ? (currentStep.bgColor || '#000') : '#000' } },
-                            showGrid && e('svg', { className: 'canvas-grid', width: '1024', height: '576' },
-                                // Vertical lines every ~102px (10% of 1024)
-                                [0, 102.4, 204.8, 307.2, 409.6, 512, 614.4, 716.8, 819.2, 921.6, 1024].map((x, i) =>
-                                    e('line', { key: 'v' + i, x1: x, y1: 0, x2: x, y2: 576, stroke: i === 5 ? 'rgba(247,147,26,0.4)' : (i === 0 || i === 10 || i === 2 || i === 8) ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)', strokeWidth: i === 5 ? 2 : 1 })
+                        e('div', { className: 'preview', style: { width: canvasWidth + 'px', height: canvasHeight + 'px', background: currentStep ? (currentStep.bgColor || '#000') : '#000' } },
+                            showGrid && e('svg', { className: 'canvas-grid', width: canvasWidth, height: canvasHeight },
+                                // Vertical lines (10 divisions)
+                                Array.from({ length: 11 }, (_, i) => i * canvasWidth / 10).map((x, i) =>
+                                    e('line', { key: 'v' + i, x1: x, y1: 0, x2: x, y2: canvasHeight, stroke: i === 5 ? 'rgba(247,147,26,0.4)' : (i === 0 || i === 10 || i === 2 || i === 8) ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)', strokeWidth: i === 5 ? 2 : 1 })
                                 ),
-                                // Horizontal lines every ~57.6px (10% of 576)
-                                [0, 57.6, 115.2, 172.8, 230.4, 288, 345.6, 403.2, 460.8, 518.4, 576].map((y, i) =>
-                                    e('line', { key: 'h' + i, x1: 0, y1: y, x2: 1024, y2: y, stroke: i === 5 ? 'rgba(247,147,26,0.4)' : (i === 0 || i === 10 || i === 2 || i === 8) ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)', strokeWidth: i === 5 ? 2 : 1 })
+                                // Horizontal lines (10 divisions)
+                                Array.from({ length: 11 }, (_, i) => i * canvasHeight / 10).map((y, i) =>
+                                    e('line', { key: 'h' + i, x1: 0, y1: y, x2: canvasWidth, y2: y, stroke: i === 5 ? 'rgba(247,147,26,0.4)' : (i === 0 || i === 10 || i === 2 || i === 8) ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.1)', strokeWidth: i === 5 ? 2 : 1 })
                                 )
                             ),
                             currentStep && currentStep.bgShapes && currentStep.bgShapes.map(shape =>
@@ -953,7 +1180,7 @@
                                                 top: elem.y + 'px',
                                                 width: elem.width + 'px',
                                                 height: elem.height + 'px',
-                                                zIndex: elem.layer,
+                                                zIndex: (previewOnTop && elem.id === selectedElementId) ? 9999 : elem.layer,
                                                 borderRadius: elem.shape === 'circle' ? '50%' : '0'
                                             },
                                             onMouseDown: (ev) => handleMouseDown(ev, elem.id)
@@ -966,6 +1193,10 @@
                                     style: { 
                                         fontSize: (elem.textSize || 24) + 'px',
                                         color: elem.textColor || '#ffffff',
+                                        fontWeight: elem.textBold ? 'bold' : 'normal',
+                                        fontStyle: elem.textItalic ? 'italic' : 'normal',
+                                        textDecoration: elem.textUnderline ? 'underline' : 'none',
+                                        border: elem.textBorder ? ((elem.textBorderWidth || 2) + 'px solid ' + (elem.textBorderColor || '#ffffff')) : 'none',
                                         background: elem.textBgColor ? 
                                             (elem.textBgColor.startsWith('#') ? 
                                                 elem.textBgColor + Math.round((elem.textBgOpacity || 0.8) * 255).toString(16).padStart(2, '0') : 
@@ -973,7 +1204,7 @@
                                             'rgba(0,0,0,0.8)'
                                     }
                                 }, elem.content),
-                                            elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color, color: elem.buttonTextColor || '#ffffff', fontSize: (elem.buttonTextSize || 20) + 'px' } }, elem.content || 'Button'),
+                                            elem.type === 'button' && e('div', { className: 'element-button' + (elem.buttonPulse ? ' anim-buttonPulse' : ''), style: { background: elem.color, color: elem.buttonTextColor || '#ffffff', fontSize: (elem.buttonTextSize || 20) + 'px', boxShadow: elem.buttonShadow ? '0 4px 15px rgba(0,0,0,0.4)' : 'none' } }, elem.content || 'Button'),
                                             elem.type === 'audio' && e('div', { className: 'element-audio' }, '🔊'),
                                             elem.type === 'timer' && e('div', { className: 'element-timer' }, elem.countdown),
                                             elem.type === 'draggable' && e('div', { className: 'element-draggable' },
@@ -993,6 +1224,14 @@
                                                     opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100
                                                 }
                                             }),
+                                            elem.type === 'embed' && e('div', { className: 'element-embed' }, 
+                                                elem.embedThumbnail ? 
+                                                    e('img', { src: elem.embedThumbnail, style: { width: '100%', height: '100%', objectFit: 'cover' } }) :
+                                                    e('div', null,
+                                                        e('div', null, '🌐 Embed'),
+                                                        e('div', { style: { fontSize: '0.7rem', marginTop: '5px' } }, elem.embedUrl ? elem.embedUrl.substring(0, 25) + '...' : 'No URL set')
+                                                    )
+                                            ),
                                             e('div', { className: 'resize-handle' })
                                         )
                                     ) :
@@ -1017,7 +1256,8 @@
                             e('button', { className: 'tab' + (activeTab === 'elements' ? ' active' : ''), onClick: () => setActiveTab('elements') }, 'Elements'),
                             e('button', { className: 'tab' + (activeTab === 'events' ? ' active' : ''), onClick: () => setActiveTab('events') }, 'Events'),
                             e('button', { className: 'tab' + (activeTab === 'inventory' ? ' active' : ''), onClick: () => setActiveTab('inventory') }, 'Inventory'),
-                            e('button', { className: 'tab' + (activeTab === 'settings' ? ' active' : ''), onClick: () => setActiveTab('settings') }, 'Settings')
+                            e('button', { className: 'tab' + (activeTab === 'settings' ? ' active' : ''), onClick: () => setActiveTab('settings') }, 'Settings'),
+                            e('button', { className: 'tab' + (activeTab === 'bgm' ? ' active' : ''), onClick: () => setActiveTab('bgm') }, 'BGM')
                         ),
 
                         activeTab === 'elements' && e('div', null,
@@ -1030,7 +1270,8 @@
                             e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('timer') }, '⏱️ Timer'),
                             e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('draggable') }, '🎯 Draggable'),
                             e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('hotspot') }, '📍 Hotspot'),
-                            e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '8px' }, onClick: () => addElement('object') }, '⬜ Object'),
+                            e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '2px' }, onClick: () => addElement('object') }, '⬜ Object'),
+                            e('button', { className: 'btn btn-secondary btn-small', style: { width: '100%', marginBottom: '8px' }, onClick: () => addElement('embed') }, '🌐 Embed'),
                             
                             selectedElement && e('div', null,
                                 e('div', { className: 'section-title' }, selectedElement.label),
@@ -1080,18 +1321,33 @@
                                         e('textarea', { className: 'form-textarea', value: selectedElement.content, onChange: (ev) => updateElement(selectedElement.id, { content: ev.target.value }) }) :
                                         e('div', null,
                                             e('input', { className: 'form-input', value: selectedElement.content, placeholder: 'https://...', onChange: (ev) => updateElement(selectedElement.id, { content: ev.target.value }), style: { marginBottom: '5px' } }),
-                                            e('input', { 
-                                                type: 'file', 
-                                                className: 'form-input',
-                                                accept: selectedElement.type === 'image' ? 'image/*' : 'video/*',
-                                                onChange: (ev) => {
-                                                    const file = ev.target.files[0];
-                                                    if (file) {
-                                                        const url = URL.createObjectURL(file);
-                                                        updateElement(selectedElement.id, { content: url });
+                                            e('div', { style: { display: 'flex', gap: '5px' } },
+                                                e('input', { 
+                                                    type: 'file', 
+                                                    className: 'form-input',
+                                                    style: { flex: 1 },
+                                                    accept: selectedElement.type === 'image' ? 'image/*' : 'video/*',
+                                                    onChange: (ev) => {
+                                                        const file = ev.target.files[0];
+                                                        if (file) {
+                                                            const url = URL.createObjectURL(file);
+                                                            updateElement(selectedElement.id, { content: url });
+                                                        }
                                                     }
-                                                }
-                                            })
+                                                }),
+                                                savedUrls.length > 0 && e('select', {
+                                                    className: 'form-select',
+                                                    style: { width: '80px', fontSize: '0.6rem' },
+                                                    value: '',
+                                                    onChange: (ev) => {
+                                                        if (ev.target.value) updateElement(selectedElement.id, { content: ev.target.value });
+                                                        ev.target.value = '';
+                                                    }
+                                                },
+                                                    e('option', { value: '' }, '📁 Saved'),
+                                                    savedUrls.filter(u => u).map((url, i) => e('option', { key: i, value: url }, '...' + url.slice(-25)))
+                                                )
+                                            )
                                         )
                                 ),
                                 selectedElement.type === 'audio' && e('div', { className: 'form-group' },
@@ -1125,6 +1381,75 @@
                                 selectedElement.type === 'button' && e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Text Size'),
                                     e('input', { type: 'number', className: 'form-input', value: selectedElement.buttonTextSize || 20, onChange: (ev) => updateElement(selectedElement.id, { buttonTextSize: parseInt(ev.target.value) || 20 }) })
+                                ),
+                                selectedElement.type === 'button' && e('div', { className: 'form-group' },
+                                    e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', cursor: 'pointer' } },
+                                        e('input', { 
+                                            type: 'checkbox', 
+                                            className: 'form-checkbox',
+                                            checked: selectedElement.buttonShadow || false,
+                                            onChange: (ev) => updateElement(selectedElement.id, { buttonShadow: ev.target.checked })
+                                        }),
+                                        '🌑 Add Shadow'
+                                    )
+                                ),
+                                selectedElement.type === 'button' && e('div', { className: 'form-group' },
+                                    e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', cursor: 'pointer' } },
+                                        e('input', { 
+                                            type: 'checkbox', 
+                                            className: 'form-checkbox',
+                                            checked: selectedElement.buttonPulse || false,
+                                            onChange: (ev) => updateElement(selectedElement.id, { buttonPulse: ev.target.checked })
+                                        }),
+                                        '💫 Pulse Animation'
+                                    )
+                                ),
+                                // Embed element properties
+                                selectedElement.type === 'embed' && e('div', null,
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Embed URL'),
+                                        e('input', { className: 'form-input', value: selectedElement.embedUrl || '', placeholder: 'https://...', onChange: (ev) => updateElement(selectedElement.id, { embedUrl: ev.target.value }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Thumbnail Image (optional)'),
+                                        e('input', { className: 'form-input', value: selectedElement.embedThumbnail || '', placeholder: 'https://... or upload below', onChange: (ev) => updateElement(selectedElement.id, { embedThumbnail: ev.target.value }), style: { marginBottom: '5px' } }),
+                                        e('input', { 
+                                            type: 'file', 
+                                            className: 'form-input',
+                                            accept: 'image/*',
+                                            onChange: (ev) => {
+                                                const file = ev.target.files[0];
+                                                if (file) {
+                                                    const reader = new FileReader();
+                                                    reader.onload = (e) => updateElement(selectedElement.id, { embedThumbnail: e.target.result });
+                                                    reader.readAsDataURL(file);
+                                                }
+                                            }
+                                        })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', cursor: 'pointer' } },
+                                            e('input', { 
+                                                type: 'checkbox', 
+                                                className: 'form-checkbox',
+                                                checked: selectedElement.embedAllowNavigation || false,
+                                                onChange: (ev) => updateElement(selectedElement.id, { embedAllowNavigation: ev.target.checked })
+                                            }),
+                                            'Allow navigation outside canvas'
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Close Button Delay (seconds)'),
+                                        e('input', { 
+                                            type: 'number', 
+                                            className: 'form-input', 
+                                            min: '0',
+                                            value: selectedElement.embedCloseDelay || 0, 
+                                            placeholder: '0 = always visible',
+                                            onChange: (ev) => updateElement(selectedElement.id, { embedCloseDelay: parseInt(ev.target.value) || 0 }) 
+                                        })
+                                    ),
+                                    e('div', { className: 'info-box' }, 'Thumbnail replaces the default purple play button. Close delay hides X button for set seconds (0 = always visible).')
                                 ),
                                 selectedElement.type === 'hotspot' && e('div', { className: 'form-group' },
                                     e('label', { className: 'form-label' }, 'Interaction Mode'),
@@ -1209,6 +1534,47 @@
                                     e('div', { className: 'form-group' },
                                         e('label', { className: 'form-label' }, 'Background Opacity (0-100)'),
                                         e('input', { type: 'number', min: '0', max: '100', className: 'form-input', value: selectedElement.textBgOpacity !== undefined ? Math.round(selectedElement.textBgOpacity * 100) : 80, onChange: (ev) => updateElement(selectedElement.id, { textBgOpacity: Math.max(0, Math.min(100, parseInt(ev.target.value) || 0)) / 100 }) })
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { className: 'form-label' }, 'Text Style'),
+                                        e('div', { style: { display: 'flex', gap: '5px' } },
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.textBold ? 'btn-primary' : 'btn-secondary'),
+                                                style: { fontWeight: 'bold' },
+                                                onClick: () => updateElement(selectedElement.id, { textBold: !selectedElement.textBold })
+                                            }, 'B'),
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.textItalic ? 'btn-primary' : 'btn-secondary'),
+                                                style: { fontStyle: 'italic' },
+                                                onClick: () => updateElement(selectedElement.id, { textItalic: !selectedElement.textItalic })
+                                            }, 'I'),
+                                            e('button', { 
+                                                className: 'btn btn-small ' + (selectedElement.textUnderline ? 'btn-primary' : 'btn-secondary'),
+                                                style: { textDecoration: 'underline' },
+                                                onClick: () => updateElement(selectedElement.id, { textUnderline: !selectedElement.textUnderline })
+                                            }, 'U')
+                                        )
+                                    ),
+                                    e('div', { className: 'form-group' },
+                                        e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', cursor: 'pointer' } },
+                                            e('input', { 
+                                                type: 'checkbox', 
+                                                className: 'form-checkbox',
+                                                checked: selectedElement.textBorder || false,
+                                                onChange: (ev) => updateElement(selectedElement.id, { textBorder: ev.target.checked })
+                                            }),
+                                            'Border'
+                                        )
+                                    ),
+                                    selectedElement.textBorder && e('div', { style: { display: 'flex', gap: '5px' } },
+                                        e('div', { className: 'form-group', style: { flex: 1, marginBottom: 0 } },
+                                            e('label', { className: 'form-label' }, 'Width'),
+                                            e('input', { type: 'number', min: '1', max: '10', className: 'form-input', value: selectedElement.textBorderWidth || 2, onChange: (ev) => updateElement(selectedElement.id, { textBorderWidth: parseInt(ev.target.value) || 2 }) })
+                                        ),
+                                        e('div', { className: 'form-group', style: { flex: 1, marginBottom: 0 } },
+                                            e('label', { className: 'form-label' }, 'Color'),
+                                            e('input', { type: 'color', className: 'form-input', value: selectedElement.textBorderColor || '#ffffff', onChange: (ev) => updateElement(selectedElement.id, { textBorderColor: ev.target.value }) })
+                                        )
                                     )
                                 ),
                                 (selectedElement.type === 'audio' || selectedElement.type === 'video') && e('div', { className: 'form-group' },
@@ -1312,6 +1678,17 @@
                                 e('div', { style: { display: 'flex', gap: '5px', marginTop: '10px' } },
                                     e('button', { className: 'btn btn-secondary btn-small', style: { flex: 1 }, onClick: () => copyElement(selectedElement) }, '📋 Copy'),
                                     e('button', { className: 'btn btn-danger btn-small', style: { flex: 1 }, onClick: () => deleteElement(selectedElement.id) }, '🗑️ Delete')
+                                ),
+                                e('div', { style: { marginTop: '8px' } },
+                                    e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', cursor: 'pointer' } },
+                                        e('input', { 
+                                            type: 'checkbox', 
+                                            className: 'form-checkbox',
+                                            checked: previewOnTop,
+                                            onChange: (ev) => setPreviewOnTop(ev.target.checked)
+                                        }),
+                                        '👁️ Preview selected on top'
+                                    )
                                 )
                             ),
 
@@ -1373,7 +1750,8 @@
                                                 e('option', { value: 'afterDelay' }, 'After Delay'),
                                                 e('option', { value: 'afterElement' }, 'After Element'),
                                                 e('option', { value: 'onClick' }, 'On Click'),
-                                                e('option', { value: 'onDrop' }, 'On Drop')
+                                                e('option', { value: 'onDrop' }, 'On Drop'),
+                                                e('option', { value: 'onEmbedClose' }, 'On Embed Close')
                                             )
                                         ),
                                         event.trigger.type === 'afterDelay' && e('input', { type: 'number', className: 'form-input', placeholder: 'Seconds', value: event.trigger.delay || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, delay: parseFloat(ev.target.value) || 0 } }), style: { marginBottom: '5px' } }),
@@ -1381,9 +1759,51 @@
                                             e('option', { value: '' }, '-- Select Element --'),
                                             currentStep.elements.map(el => e('option', { key: el.id, value: el.id }, el.label))
                                         ),
-                                        (event.trigger.type === 'onClick' || event.trigger.type === 'onDrop') && e('select', { className: 'form-select', value: event.trigger.sourceElement || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, sourceElement: ev.target.value } }), style: { marginBottom: '5px' } },
-                                            e('option', { value: '' }, event.trigger.type === 'onClick' ? '-- Click Target --' : '-- Drop Zone --'),
+                                        event.trigger.type === 'onEmbedClose' && e('select', { className: 'form-select', value: event.trigger.sourceElement || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, sourceElement: ev.target.value } }), style: { marginBottom: '5px' } },
+                                            e('option', { value: '' }, '-- Select Embed --'),
+                                            currentStep.elements.filter(el => el.type === 'embed').map(el => e('option', { key: el.id, value: el.id }, el.label))
+                                        ),
+                                        event.trigger.type === 'onDrop' && e('select', { className: 'form-select', value: event.trigger.sourceElement || '', onChange: (ev) => updateEvent(event.id, { trigger: { ...event.trigger, sourceElement: ev.target.value } }), style: { marginBottom: '5px' } },
+                                            e('option', { value: '' }, '-- Drop Zone --'),
                                             currentStep.elements.filter(el => el.type === 'button' || el.type === 'hotspot').map(el => e('option', { key: el.id, value: el.id }, el.label))
+                                        ),
+                                        event.trigger.type === 'onClick' && e('div', null,
+                                            e('div', { 
+                                                className: 'collapsible-header', 
+                                                onClick: () => toggleActionCollapse('trigger_' + event.id),
+                                                style: { marginBottom: '5px' }
+                                            },
+                                                e('span', { style: { fontSize: '0.6rem', color: '#10b981' } }, 
+                                                    (() => {
+                                                        const sources = event.trigger.sourceElements || (event.trigger.sourceElement ? [event.trigger.sourceElement] : []);
+                                                        const validSources = sources.filter(s => currentStep.elements.some(el => el.id === s));
+                                                        return validSources.length + ' trigger(s) selected';
+                                                    })()
+                                                ),
+                                                e('span', { className: 'collapsible-arrow' + (collapsedActions['trigger_' + event.id] ? '' : ' open') }, '▶')
+                                            ),
+                                            e('div', { className: 'collapsible-content' + (!collapsedActions['trigger_' + event.id] ? ' open' : '') },
+                                                currentStep.elements.filter(el => el.type === 'button' || el.type === 'hotspot').map(el => 
+                                                    e('label', { key: el.id, style: { display: 'flex', alignItems: 'center', fontSize: '0.6rem', cursor: 'pointer', marginBottom: '2px' } },
+                                                        e('input', { 
+                                                            type: 'checkbox', 
+                                                            className: 'form-checkbox',
+                                                            checked: (event.trigger.sourceElements || (event.trigger.sourceElement ? [event.trigger.sourceElement] : [])).includes(el.id),
+                                                            onChange: (ev) => {
+                                                                const currentSources = event.trigger.sourceElements || (event.trigger.sourceElement ? [event.trigger.sourceElement] : []);
+                                                                let newSources;
+                                                                if (ev.target.checked) {
+                                                                    newSources = [...currentSources, el.id];
+                                                                } else {
+                                                                    newSources = currentSources.filter(s => s !== el.id);
+                                                                }
+                                                                updateEvent(event.id, { trigger: { ...event.trigger, sourceElements: newSources, sourceElement: '' } });
+                                                            }
+                                                        }),
+                                                        el.label
+                                                    )
+                                                )
+                                            )
                                         ),
                                         
                                         event.condition && e('div', { className: 'condition-box' },
@@ -1399,9 +1819,53 @@
                                             e('option', { value: 'varyingBetween' }, '📊 Has Between')
                                         ),
                                         (event.condition.type === 'hasItem' || event.condition.type === 'notHasItem') ?
-                                            e('select', { className: 'form-select', value: event.condition.item, onChange: (ev) => updateEvent(event.id, { condition: { ...event.condition, item: ev.target.value } }) },
-                                                e('option', { value: '' }, '-- Item --'),
-                                                inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
+                                            e('div', null,
+                                                e('div', { style: { display: 'flex', gap: '5px', marginBottom: '5px' } },
+                                                    e('button', { 
+                                                        className: 'btn btn-small ' + ((event.condition.logic || 'any') === 'any' ? 'btn-primary' : 'btn-secondary'),
+                                                        onClick: () => updateEvent(event.id, { condition: { ...event.condition, logic: 'any' } })
+                                                    }, 'ANY'),
+                                                    e('button', { 
+                                                        className: 'btn btn-small ' + ((event.condition.logic || 'any') === 'all' ? 'btn-primary' : 'btn-secondary'),
+                                                        onClick: () => updateEvent(event.id, { condition: { ...event.condition, logic: 'all' } })
+                                                    }, 'ALL')
+                                                ),
+                                                e('div', { 
+                                                    className: 'collapsible-header', 
+                                                    onClick: () => toggleActionCollapse('cond_' + event.id),
+                                                    style: { marginBottom: '3px' }
+                                                },
+                                                    e('span', { style: { fontSize: '0.6rem', color: '#f59e0b' } }, 
+                                                        (() => {
+                                                            const items = event.condition.items || (event.condition.item ? [event.condition.item] : []);
+                                                            return items.length + ' item(s) selected';
+                                                        })()
+                                                    ),
+                                                    e('span', { className: 'collapsible-arrow' + (collapsedActions['cond_' + event.id] ? '' : ' open') }, '▶')
+                                                ),
+                                                e('div', { className: 'collapsible-content' + (!collapsedActions['cond_' + event.id] ? ' open' : ''), style: { maxHeight: '120px', overflowY: 'auto' } },
+                                                    inventory.map(item => {
+                                                        const itemName = item.name || item;
+                                                        return e('label', { key: itemName, style: { display: 'flex', alignItems: 'center', fontSize: '0.6rem', cursor: 'pointer', marginBottom: '2px' } },
+                                                            e('input', { 
+                                                                type: 'checkbox', 
+                                                                className: 'form-checkbox',
+                                                                checked: (event.condition.items || (event.condition.item ? [event.condition.item] : [])).includes(itemName),
+                                                                onChange: (ev) => {
+                                                                    const currentItems = event.condition.items || (event.condition.item ? [event.condition.item] : []);
+                                                                    let newItems;
+                                                                    if (ev.target.checked) {
+                                                                        newItems = [...currentItems, itemName];
+                                                                    } else {
+                                                                        newItems = currentItems.filter(i => i !== itemName);
+                                                                    }
+                                                                    updateEvent(event.id, { condition: { ...event.condition, items: newItems, item: '' } });
+                                                                }
+                                                            }),
+                                                            itemName
+                                                        );
+                                                    })
+                                                )
                                             ) :
                                         (event.condition.type === 'varyingAtLeast' || event.condition.type === 'varyingAtMost') ?
                                             e('div', null,
@@ -1436,8 +1900,21 @@
                                                 e('option', { value: 'addItem' }, 'Add Inventory'),
                                                 e('option', { value: 'removeItem' }, 'Remove Inventory'),
                                                 e('option', { value: 'addVarying' }, '📊 Add to Varying'),
-                                                e('option', { value: 'subtractVarying' }, '📊 Subtract from Varying')
+                                                e('option', { value: 'subtractVarying' }, '📊 Subtract from Varying'),
+                                                e('option', { value: 'setVarying' }, '📊 Set Varying To'),
+                                                e('option', { value: 'bgmPlay' }, '🎵 BGM Play'),
+                                                e('option', { value: 'bgmStop' }, '🔇 BGM Stop'),
+                                                e('option', { value: 'showInventory' }, '👁️ Show Inventory'),
+                                                e('option', { value: 'hideInventory' }, '🚫 Hide Inventory'),
+                                                e('option', { value: 'showVarying' }, '👁️ Show Varying'),
+                                                e('option', { value: 'hideVarying' }, '🚫 Hide Varying'),
+                                                e('option', { value: 'saveState' }, '💾 Save Game State'),
+                                                e('option', { value: 'loadState' }, '📂 Load Game State'),
+                                                e('option', { value: 'clearState' }, '🗑️ Clear Saved State')
                                             ),
+                                            // Simple actions that need no additional config
+                                            (action.type === 'bgmPlay' || action.type === 'bgmStop' || action.type === 'showInventory' || action.type === 'hideInventory' || action.type === 'showVarying' || action.type === 'hideVarying' || action.type === 'saveState' || action.type === 'loadState' || action.type === 'clearState') ?
+                                                e('div', { style: { fontSize: '0.6rem', color: '#10b981', padding: '5px' } }, '✓ No configuration needed') :
                                             action.type === 'goto' ?
                                                 e('div', null,
                                                     e('div', { style: { fontSize: '0.6rem', color: '#f7931a', marginBottom: '3px' } }, 'Select one or more (random if multiple):'),
@@ -1472,14 +1949,14 @@
                                                     e('option', { value: '' }, '-- Item --'),
                                                     inventory.map(item => e('option', { key: item.name || item, value: item.name || item }, item.name || item))
                                                 ) :
-                                            action.type === 'addVarying' || action.type === 'subtractVarying' ?
+                                            action.type === 'addVarying' || action.type === 'subtractVarying' || action.type === 'setVarying' ?
                                                 e('div', null,
                                                     e('select', { className: 'form-select', value: action.target, onChange: (ev) => updateEventAction(event.id, action.id, { target: ev.target.value }), style: { marginBottom: '5px' } },
                                                         e('option', { value: '' }, '-- Varying Item --'),
                                                         varyingItems.map(item => e('option', { key: item.name, value: item.name }, item.name))
                                                     ),
                                                     e('div', { className: 'form-group', style: { marginBottom: '0' } },
-                                                        e('label', { className: 'form-label' }, 'Amount'),
+                                                        e('label', { className: 'form-label' }, action.type === 'setVarying' ? 'Set To Value' : 'Amount'),
                                                         e('input', { type: 'number', className: 'form-input', value: action.amount || 0, onChange: (ev) => updateEventAction(event.id, action.id, { amount: parseFloat(ev.target.value) || 0 }) })
                                                     )
                                                 ) :
@@ -1636,14 +2113,231 @@
                                     steps.map(s => e('option', { key: s.id, value: s.id }, s.title))
                                 )
                             ),
-                            e('div', { className: 'info-box' }, 'Background shapes appear behind all elements')
+                            e('div', { className: 'info-box' }, 'Background shapes appear behind all elements'),
+                            
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'Canvas Mode'),
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Orientation (set once at start)'),
+                                e('select', { 
+                                    className: 'form-select', 
+                                    value: canvasMode,
+                                    onChange: (ev) => {
+                                        if (steps.length > 1 || (steps.length === 1 && steps[0].elements.length > 0)) {
+                                            if (!confirm('Changing canvas mode may affect element positions. Continue?')) return;
+                                        }
+                                        setCanvasMode(ev.target.value);
+                                    }
+                                },
+                                    e('option', { value: 'landscape' }, '📺 Landscape (1024×576)'),
+                                    e('option', { value: 'portrait' }, '📱 Portrait (576×1024)')
+                                )
+                            ),
+                            
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'Save System Key'),
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Unique Game ID'),
+                                e('input', { 
+                                    className: 'form-input', 
+                                    value: saveKey,
+                                    placeholder: 'e.g. my_rpg_game',
+                                    onChange: (ev) => setSaveKey(ev.target.value.replace(/[^a-zA-Z0-9_-]/g, ''))
+                                })
+                            ),
+                            e('div', { className: 'info-box' }, 'Each game needs a unique key to prevent save conflicts. Use letters, numbers, underscores. Leave empty for legacy mode.'),
+                            
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'Saved URLs (for re-use)'),
+                            e('div', { className: 'info-box' }, 'Add URLs here to quickly re-use in element URL fields.'),
+                            savedUrls.map((url, idx) =>
+                                e('div', { key: idx, style: { display: 'flex', gap: '5px', marginBottom: '4px' } },
+                                    e('input', { 
+                                        className: 'form-input', 
+                                        style: { flex: 1, fontSize: '0.6rem' },
+                                        value: url, 
+                                        placeholder: 'https://...',
+                                        onChange: (ev) => setSavedUrls(savedUrls.map((u, i) => i === idx ? ev.target.value : u))
+                                    }),
+                                    e('button', { 
+                                        className: 'btn btn-danger btn-small',
+                                        onClick: () => setSavedUrls(savedUrls.filter((_, i) => i !== idx))
+                                    }, '×')
+                                )
+                            ),
+                            e('button', { 
+                                className: 'add-btn', 
+                                onClick: () => setSavedUrls([...savedUrls, ''])
+                            }, '+ Add URL')
+                        ),
+
+                        activeTab === 'bgm' && e('div', null,
+                            e('div', { className: 'section-title' }, 'Background Music'),
+                            e('div', { className: 'info-box' }, 'BGM plays continuously across steps until stopped. Use event actions to control it.'),
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'BGM Audio URL'),
+                                e('input', { 
+                                    className: 'form-input', 
+                                    value: bgmSettings.url || '', 
+                                    placeholder: 'https://... or upload below',
+                                    onChange: (ev) => setBgmSettings({ ...bgmSettings, url: ev.target.value }) 
+                                })
+                            ),
+                            e('div', { className: 'form-group' },
+                                e('input', { 
+                                    type: 'file', 
+                                    className: 'form-input',
+                                    accept: 'audio/*',
+                                    onChange: (ev) => {
+                                        const file = ev.target.files[0];
+                                        if (file) {
+                                            const url = URL.createObjectURL(file);
+                                            setBgmSettings({ ...bgmSettings, url: url });
+                                        }
+                                    }
+                                })
+                            ),
+                            e('div', { className: 'form-group' },
+                                e('label', { style: { display: 'flex', alignItems: 'center', fontSize: '0.65rem', cursor: 'pointer' } },
+                                    e('input', { 
+                                        type: 'checkbox', 
+                                        className: 'form-checkbox',
+                                        checked: bgmSettings.loop !== false,
+                                        onChange: (ev) => setBgmSettings({ ...bgmSettings, loop: ev.target.checked })
+                                    }),
+                                    'Loop continuously'
+                                )
+                            ),
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Volume (0-100)'),
+                                e('input', { 
+                                    type: 'number', 
+                                    min: '0', 
+                                    max: '100', 
+                                    className: 'form-input', 
+                                    value: bgmSettings.volume || 100, 
+                                    onChange: (ev) => setBgmSettings({ ...bgmSettings, volume: Math.max(0, Math.min(100, parseInt(ev.target.value) || 100)) })
+                                })
+                            ),
+                            e('div', { className: 'section-title', style: { marginTop: '15px' } }, 'Inventory Display Settings'),
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Position'),
+                                e('select', { 
+                                    className: 'form-select', 
+                                    value: inventorySettings.position || 'bottom-left',
+                                    onChange: (ev) => setInventorySettings({ ...inventorySettings, position: ev.target.value })
+                                },
+                                    e('option', { value: 'bottom-left' }, 'Bottom Left'),
+                                    e('option', { value: 'bottom-right' }, 'Bottom Right'),
+                                    e('option', { value: 'top-left' }, 'Top Left'),
+                                    e('option', { value: 'top-right' }, 'Top Right'),
+                                    e('option', { value: 'custom' }, 'Custom Position')
+                                )
+                            ),
+                            inventorySettings.position === 'custom' && e('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '5px' } },
+                                e('div', { className: 'form-group', style: { marginBottom: 0 } },
+                                    e('label', { className: 'form-label' }, 'X'),
+                                    e('input', { 
+                                        type: 'number', 
+                                        className: 'form-input', 
+                                        value: inventorySettings.x || 20,
+                                        onChange: (ev) => setInventorySettings({ ...inventorySettings, x: parseInt(ev.target.value) || 0 })
+                                    })
+                                ),
+                                e('div', { className: 'form-group', style: { marginBottom: 0 } },
+                                    e('label', { className: 'form-label' }, 'Y'),
+                                    e('input', { 
+                                        type: 'number', 
+                                        className: 'form-input', 
+                                        value: inventorySettings.y || 20,
+                                        onChange: (ev) => setInventorySettings({ ...inventorySettings, y: parseInt(ev.target.value) || 0 })
+                                    })
+                                )
+                            ),
+                            e('div', { className: 'info-box', style: { marginTop: '10px' } }, 'Use event actions "BGM Play", "BGM Stop", "Show Inventory", "Hide Inventory" to control during gameplay.'),
+                            
+                            e('div', { className: 'section-title', style: { marginTop: '20px' } }, '🛠️ Developer Tools'),
+                            
+                            // Current Step ID
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Current Step ID'),
+                                e('div', { style: { display: 'flex', gap: '5px' } },
+                                    e('input', { 
+                                        className: 'form-input', 
+                                        value: currentStep?.id || '', 
+                                        readOnly: true,
+                                        style: { flex: 1, fontSize: '0.65rem', background: '#0d1117' }
+                                    }),
+                                    e('button', { 
+                                        className: 'btn btn-secondary btn-small',
+                                        onClick: () => {
+                                            navigator.clipboard.writeText(currentStep?.id || '');
+                                            alert('Step ID copied!');
+                                        }
+                                    }, '📋')
+                                )
+                            ),
+                            
+                            // Home Step ID
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Home Step ID (Step 1)'),
+                                e('div', { style: { display: 'flex', gap: '5px' } },
+                                    e('input', { 
+                                        className: 'form-input', 
+                                        value: steps[0]?.id || '', 
+                                        readOnly: true,
+                                        style: { flex: 1, fontSize: '0.65rem', background: '#0d1117' }
+                                    }),
+                                    e('button', { 
+                                        className: 'btn btn-secondary btn-small',
+                                        onClick: () => {
+                                            navigator.clipboard.writeText(steps[0]?.id || '');
+                                            alert('Home Step ID copied!');
+                                        }
+                                    }, '📋')
+                                )
+                            ),
+                            
+                            // LocalStorage Template
+                            e('div', { className: 'form-group' },
+                                e('label', { className: 'form-label' }, 'Storage Key: ' + (saveKey ? 'storyGameSave_' + saveKey : 'storyGameSave (legacy)')),
+                                e('textarea', { 
+                                    className: 'form-textarea', 
+                                    readOnly: true,
+                                    style: { fontSize: '0.6rem', background: '#0d1117', minHeight: '120px', fontFamily: 'monospace' },
+                                    value: JSON.stringify({
+                                        stepId: steps[0]?.id || 'step_xxx',
+                                        inventory: inventory.map(i => i.name || i),
+                                        varying: varyingItems.reduce((acc, vi) => { acc[vi.name] = 0; return acc; }, {})
+                                    }, null, 2)
+                                }),
+                                e('button', { 
+                                    className: 'btn btn-secondary btn-small',
+                                    style: { marginTop: '5px', width: '100%' },
+                                    onClick: () => {
+                                        const template = JSON.stringify({
+                                            stepId: steps[0]?.id || 'step_xxx',
+                                            inventory: inventory.map(i => i.name || i),
+                                            varying: varyingItems.reduce((acc, vi) => { acc[vi.name] = 0; return acc; }, {})
+                                        }, null, 2);
+                                        navigator.clipboard.writeText(template);
+                                        alert('Template copied!');
+                                    }
+                                }, '📋 Copy Template'),
+                                e('button', { 
+                                    className: 'btn btn-secondary btn-small',
+                                    style: { marginTop: '5px', width: '100%' },
+                                    onClick: () => {
+                                        navigator.clipboard.writeText(saveKey ? 'storyGameSave_' + saveKey : 'storyGameSave');
+                                        alert('Storage key copied!');
+                                    }
+                                }, '📋 Copy Storage Key')
+                            ),
+                            e('div', { className: 'info-box' }, 'Use this key in your minigame: localStorage.getItem("' + (saveKey ? 'storyGameSave_' + saveKey : 'storyGameSave') + '")')
                         )
                     ) : e('div', { className: 'info-box' }, '← Create a step')
                 )
             );
         }
 
-        function PlayMode({ steps, inventory, varyingItems, onExit, startStepId }) {
+        function PlayMode({ steps, inventory, varyingItems, onExit, startStepId, bgmSettings, inventorySettings }) {
             const [currentStepId, setCurrentStepId] = useState(startStepId || steps[0]?.id);
             const [visibleElements, setVisibleElements] = useState({});
             const [playerInventory, setPlayerInventory] = useState([]);
@@ -1654,6 +2348,27 @@
             const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
             const [dragPos, setDragPos] = useState({ x: 0, y: 0 });
             const [hidingElements, setHidingElements] = useState({});
+            const [bgmPlaying, setBgmPlaying] = useState(false);
+            const [activeEmbed, setActiveEmbed] = useState(null);
+            const [embedCloseVisible, setEmbedCloseVisible] = useState(true);
+            const [showInventoryDisplay, setShowInventoryDisplay] = useState(inventorySettings?.showInventory !== false);
+            const [showVaryingDisplay, setShowVaryingDisplay] = useState(inventorySettings?.showVarying !== false);
+            const bgmRef = useRef(null);
+
+            // Handle embed close button delay
+            useEffect(() => {
+                if (activeEmbed) {
+                    const embedElem = steps.find(s => s.id === currentStepId)?.elements.find(el => el.id === activeEmbed);
+                    const delay = embedElem?.embedCloseDelay || 0;
+                    if (delay > 0) {
+                        setEmbedCloseVisible(false);
+                        const timer = setTimeout(() => setEmbedCloseVisible(true), delay * 1000);
+                        return () => clearTimeout(timer);
+                    } else {
+                        setEmbedCloseVisible(true);
+                    }
+                }
+            }, [activeEmbed]);
 
             const currentStep = steps.find(s => s.id === currentStepId);
 
@@ -1741,9 +2456,27 @@
             const checkCondition = (condition) => {
                 if (!condition) return true;
                 if (condition.type === 'hasItem') {
-                    return playerInventory.includes(condition.item);
+                    // Support both old single item and new items array
+                    const items = condition.items || (condition.item ? [condition.item] : []);
+                    if (items.length === 0) return true;
+                    const logic = condition.logic || 'any';
+                    if (logic === 'all') {
+                        return items.every(item => playerInventory.includes(item));
+                    } else {
+                        return items.some(item => playerInventory.includes(item));
+                    }
                 } else if (condition.type === 'notHasItem') {
-                    return !playerInventory.includes(condition.item);
+                    // Support both old single item and new items array
+                    const items = condition.items || (condition.item ? [condition.item] : []);
+                    if (items.length === 0) return true;
+                    const logic = condition.logic || 'any';
+                    if (logic === 'all') {
+                        // ALL means: does NOT have ALL of these (missing at least one)
+                        return !items.every(item => playerInventory.includes(item));
+                    } else {
+                        // ANY means: does NOT have ANY of these (missing all)
+                        return items.every(item => !playerInventory.includes(item));
+                    }
                 } else if (condition.type === 'varyingAtLeast') {
                     return (playerVaryingValues[condition.item] || 0) >= (condition.amount || 0);
                 } else if (condition.type === 'varyingAtMost') {
@@ -1879,6 +2612,47 @@
                         setPlayerVaryingValues(prev => ({ ...prev, [action.target]: (prev[action.target] || 0) + (action.amount || 0) }));
                     } else if (action.type === 'subtractVarying') {
                         setPlayerVaryingValues(prev => ({ ...prev, [action.target]: (prev[action.target] || 0) - (action.amount || 0) }));
+                    } else if (action.type === 'setVarying') {
+                        setPlayerVaryingValues(prev => ({ ...prev, [action.target]: action.amount || 0 }));
+                    } else if (action.type === 'bgmPlay') {
+                        if (bgmRef.current) {
+                            bgmRef.current.volume = (bgmSettings?.volume || 100) / 100;
+                            bgmRef.current.play().catch(() => {});
+                            setBgmPlaying(true);
+                        }
+                    } else if (action.type === 'bgmStop') {
+                        if (bgmRef.current) {
+                            bgmRef.current.pause();
+                            bgmRef.current.currentTime = 0;
+                            setBgmPlaying(false);
+                        }
+                    } else if (action.type === 'showInventory') {
+                        setShowInventoryDisplay(true);
+                    } else if (action.type === 'hideInventory') {
+                        setShowInventoryDisplay(false);
+                    } else if (action.type === 'showVarying') {
+                        setShowVaryingDisplay(true);
+                    } else if (action.type === 'hideVarying') {
+                        setShowVaryingDisplay(false);
+                    } else if (action.type === 'saveState') {
+                        const saveData = {
+                            stepId: currentStepId,
+                            inventory: playerInventory,
+                            varying: playerVaryingValues
+                        };
+                        localStorage.setItem('storyGameSave', JSON.stringify(saveData));
+                    } else if (action.type === 'loadState') {
+                        const saveData = localStorage.getItem('storyGameSave');
+                        if (saveData) {
+                            const parsed = JSON.parse(saveData);
+                            setPlayerInventory(parsed.inventory || []);
+                            setPlayerVaryingValues(parsed.varying || {});
+                            if (parsed.stepId) {
+                                setCurrentStepId(parsed.stepId);
+                            }
+                        }
+                    } else if (action.type === 'clearState') {
+                        localStorage.removeItem('storyGameSave');
                     }
                 });
             };
@@ -1899,9 +2673,13 @@
                 if (elem.type === 'hotspot' && (elem.hotspotMode === 'drop')) return;
                 
                 currentStep.events.forEach(event => {
-                    if (event.trigger.type === 'onClick' && event.trigger.sourceElement === elem.id) {
-                        if (checkCondition(event.condition)) {
-                            processActions(event.actions);
+                    if (event.trigger.type === 'onClick') {
+                        // Support both old single sourceElement and new sourceElements array
+                        const sources = event.trigger.sourceElements || (event.trigger.sourceElement ? [event.trigger.sourceElement] : []);
+                        if (sources.includes(elem.id)) {
+                            if (checkCondition(event.condition)) {
+                                processActions(event.actions);
+                            }
                         }
                     }
                 });
@@ -1969,7 +2747,36 @@
                 );
             }
 
+            // Get inventory position
+            const getInvStyle = () => {
+                const pos = inventorySettings?.position || 'bottom-left';
+                if (pos === 'custom') return { left: (inventorySettings?.x || 20) + 'px', top: (inventorySettings?.y || 20) + 'px' };
+                if (pos === 'bottom-left') return { bottom: '20px', left: '20px' };
+                if (pos === 'bottom-right') return { bottom: '20px', right: '20px' };
+                if (pos === 'top-left') return { top: '20px', left: '20px' };
+                if (pos === 'top-right') return { top: '20px', right: '20px' };
+                return { bottom: '20px', left: '20px' };
+            };
+
+            // Get visible inventory items
+            const visibleInvItems = playerInventory.filter(itemName => {
+                const invItem = inventory.find(i => (i.name || i) === itemName);
+                if (!invItem) return false;
+                if (typeof invItem === 'string') return true;
+                return invItem.visible !== false;
+            });
+
+            // Get visible varying items
+            const visibleVaryingItems = varyingItems.filter(vi => vi.visible !== false);
+
             return e('div', { className: 'play-overlay' },
+                // BGM Audio element
+                bgmSettings?.url && e('audio', {
+                    ref: bgmRef,
+                    loop: bgmSettings.loop !== false,
+                    preload: 'auto',
+                    src: bgmSettings.url
+                }),
                 e('button', { className: 'btn btn-danger play-exit', onClick: onExit }, '✕ Exit'),
                 e('div', { className: 'play-canvas', style: { background: currentStep.bgColor || '#000' } },
                     currentStep.bgShapes && currentStep.bgShapes.map(shape =>
@@ -2030,6 +2837,10 @@
                                     style: { 
                                         fontSize: (elem.textSize || 24) + 'px',
                                         color: elem.textColor || '#ffffff',
+                                        fontWeight: elem.textBold ? 'bold' : 'normal',
+                                        fontStyle: elem.textItalic ? 'italic' : 'normal',
+                                        textDecoration: elem.textUnderline ? 'underline' : 'none',
+                                        border: elem.textBorder ? ((elem.textBorderWidth || 2) + 'px solid ' + (elem.textBorderColor || '#ffffff')) : 'none',
                                         background: elem.textBgColor ? 
                                             (elem.textBgColor.startsWith('#') ? 
                                                 elem.textBgColor + Math.round((elem.textBgOpacity || 0.8) * 255).toString(16).padStart(2, '0') : 
@@ -2037,7 +2848,15 @@
                                             'rgba(0,0,0,0.8)'
                                     } 
                                 }, elem.content),
-                                elem.type === 'button' && e('div', { className: 'element-button', style: { background: elem.color, color: elem.buttonTextColor || '#ffffff', fontSize: (elem.buttonTextSize || 20) + 'px' } }, elem.content || 'Button'),
+                                elem.type === 'button' && e('div', { 
+                                    className: 'element-button' + (elem.buttonPulse ? ' anim-buttonPulse' : ''), 
+                                    style: { 
+                                        background: elem.color, 
+                                        color: elem.buttonTextColor || '#ffffff', 
+                                        fontSize: (elem.buttonTextSize || 20) + 'px',
+                                        boxShadow: elem.buttonShadow ? '0 4px 15px rgba(0,0,0,0.4)' : 'none'
+                                    } 
+                                }, elem.content || 'Button'),
                                 elem.type === 'audio' && elem.content && e('audio', { src: elem.content, autoPlay: elem.autoplay, loop: elem.loop, onEnded: () => !elem.loop && handleVideoEnd(elem) }),
                                 elem.type === 'timer' && e('div', { className: 'element-timer' }, activeTimers[elem.id] !== undefined ? activeTimers[elem.id] : elem.countdown),
                                 elem.type === 'draggable' && (
@@ -2056,36 +2875,119 @@
                                         transform: 'scale(' + (elem.scaleX || 1) * (elem.flipH ? -1 : 1) + ', ' + (elem.scaleY || 1) * (elem.flipV ? -1 : 1) + ') rotate(' + (elem.rotation || 0) + 'deg)',
                                         opacity: (elem.opacity !== undefined ? elem.opacity : 100) / 100
                                     }
-                                })
+                                }),
+                                elem.type === 'embed' && e('div', {
+                                    style: {
+                                        width: '100%',
+                                        height: '100%',
+                                        background: elem.embedThumbnail ? 'transparent' : 'rgba(128,0,255,0.3)',
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        color: '#fff',
+                                        fontSize: '1.5rem',
+                                        cursor: 'pointer',
+                                        position: 'relative'
+                                    },
+                                    onClick: (ev) => {
+                                        ev.stopPropagation();
+                                        setActiveEmbed(elem.id);
+                                    }
+                                }, 
+                                    elem.embedThumbnail ? 
+                                        e('img', { src: elem.embedThumbnail, style: { width: '100%', height: '100%', objectFit: 'cover' } }) :
+                                        '▶ Click to Open'
+                                )
                             );
-                        })
+                        }),
+                    // Active embed iframe
+                    activeEmbed && (() => {
+                        const embedElem = currentStep.elements.find(el => el.id === activeEmbed);
+                        if (!embedElem) return null;
+                        return e('div', {
+                            style: {
+                                position: 'absolute',
+                                top: 0,
+                                left: 0,
+                                width: '100%',
+                                height: '100%',
+                                background: '#000',
+                                zIndex: 9999
+                            }
+                        },
+                            e('iframe', {
+                                src: embedElem.embedUrl,
+                                style: { width: '100%', height: '100%', border: 'none' },
+                                sandbox: embedElem.embedAllowNavigation ? undefined : 'allow-scripts allow-same-origin'
+                            }),
+                            embedCloseVisible && e('button', {
+                                style: {
+                                    position: 'absolute',
+                                    bottom: '10px',
+                                    right: '10px',
+                                    width: '36px',
+                                    height: '36px',
+                                    background: '#ef4444',
+                                    border: 'none',
+                                    borderRadius: '50%',
+                                    color: 'white',
+                                    fontSize: '20px',
+                                    cursor: 'pointer',
+                                    zIndex: 10000,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                },
+                                onClick: () => {
+                                    setActiveEmbed(null);
+                                    // Trigger onEmbedClose events
+                                    currentStep.events.forEach(event => {
+                                        if (event.trigger.type === 'onEmbedClose' && event.trigger.sourceElement === activeEmbed) {
+                                            if (checkCondition(event.condition)) {
+                                                processActions(event.actions);
+                                            }
+                                        }
+                                    });
+                                }
+                            }, '✕')
+                        );
+                    })()
                 ),
-                playerInventory.filter(itemName => {
-                    const invItem = inventory.find(i => (i.name || i) === itemName);
-                    return !invItem || (typeof invItem === 'string') || invItem.visible;
-                }).length > 0 && e('div', { className: 'inventory-display' },
-                    playerInventory.filter(itemName => {
-                        const invItem = inventory.find(i => (i.name || i) === itemName);
-                        return !invItem || (typeof invItem === 'string') || invItem.visible;
-                    }).map(item => e('div', { key: item, className: 'inventory-item-icon' }, item[0]))
-                ),
-                // Varying items display
-                varyingItems && varyingItems.filter(vi => vi.visible).length > 0 && e('div', { 
-                    className: 'varying-display',
+                // Combined inventory and varying display
+                (showInventoryDisplay || showVaryingDisplay) && (visibleInvItems.length > 0 || visibleVaryingItems.length > 0) && e('div', { 
                     style: {
                         position: 'fixed',
-                        top: '20px',
-                        left: '20px',
+                        ...getInvStyle(),
                         background: 'rgba(0,0,0,0.8)',
-                        padding: '10px',
+                        padding: '10px 15px',
                         borderRadius: '8px',
                         display: 'flex',
                         flexDirection: 'column',
-                        gap: '5px',
-                        zIndex: 100
+                        gap: '8px',
+                        zIndex: 100,
+                        minWidth: '120px'
                     }
                 },
-                    varyingItems.filter(vi => vi.visible).map(vi => 
+                    // Inventory items
+                    showInventoryDisplay && visibleInvItems.map(itemName => {
+                        const invItem = inventory.find(i => (i.name || i) === itemName);
+                        const displayName = invItem && invItem.displayName ? invItem.displayName : itemName;
+                        return e('div', { 
+                            key: itemName, 
+                            style: { 
+                                display: 'flex', 
+                                alignItems: 'center', 
+                                gap: '8px',
+                                color: '#f59e0b',
+                                fontSize: '14px',
+                                fontWeight: 'bold'
+                            } 
+                        },
+                            e('span', { style: { color: '#fff' } }, '• ' + displayName)
+                        );
+                    }),
+                    // Varying items
+                    showVaryingDisplay && visibleVaryingItems.map(vi => 
                         e('div', { 
                             key: vi.name, 
                             style: { 
@@ -2097,7 +2999,7 @@
                                 fontWeight: 'bold'
                             } 
                         },
-                            e('span', { style: { color: '#fff' } }, vi.name + ':'),
+                            e('span', { style: { color: '#fff' } }, (vi.displayName || vi.name) + ':'),
                             e('span', null, playerVaryingValues[vi.name] || 0)
                         )
                     )
@@ -2105,8 +3007,22 @@
             );
         }
 
-        function generateHTML(steps, inventory, varyingItems, options = {}) {
-            const { includeRefreshButton = false, optimizeVideoLoading = false } = options;
+        function generateHTML(steps, inventory, varyingItems, options = {}, bgmSettings = {}, inventorySettings = {}, canvasModeParam = 'landscape', saveKeyParam = '') {
+            const { includeRefreshButton = false, optimizeVideoLoading = false, compactLandscape = false } = options;
+            const cWidth = canvasModeParam === 'portrait' ? 576 : 1024;
+            const cHeight = canvasModeParam === 'portrait' ? 1024 : 576;
+            const storageKey = saveKeyParam ? 'storyGameSave_' + saveKeyParam : 'storyGameSave';
+            
+            // Calculate inventory position styles
+            const getInvPosition = () => {
+                const pos = inventorySettings.position || 'bottom-left';
+                if (pos === 'custom') return 'left:' + (inventorySettings.x || 20) + 'px;top:' + (inventorySettings.y || 20) + 'px;';
+                if (pos === 'bottom-left') return 'bottom:20px;left:20px;';
+                if (pos === 'bottom-right') return 'bottom:20px;right:20px;';
+                if (pos === 'top-left') return 'top:20px;left:20px;';
+                if (pos === 'top-right') return 'top:20px;right:20px;';
+                return 'bottom:20px;left:20px;';
+            };
             
             return `<!DOCTYPE html>
 <html>
@@ -2116,7 +3032,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; overflow: hidden; }
-        .canvas { width: 1024px; height: 576px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        .canvas { width: ${cWidth}px; height: ${cHeight}px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        ${compactLandscape && canvasModeParam === 'landscape' ? '@media (orientation: landscape) { .canvas { width: 870px; height: 490px; } }' : ''}
         .elem { position: absolute; }
         .elem img, .elem video { width: 100%; height: 100%; object-fit: cover; }
         .elem video { pointer-events: none; }
@@ -2129,7 +3046,15 @@
         .elem-draggable:active { cursor: grabbing; }
         .elem-draggable img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
         .elem-hotspot-visible { border: 3px dashed rgba(255,0,0,0.5); background: rgba(255,0,0,0.05); }
-        .inventory-display { position: fixed; bottom: 20px; left: 20px; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 8px; display: flex; gap: 10px; }
+        .inventory-display { position: fixed; ${getInvPosition()} background: rgba(0,0,0,0.8); padding: 10px 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; z-index: 100; min-width: 120px; }
+        .inventory-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .inventory-item-icon { width: 40px; height: 40px; background: #f7931a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .inventory-item-name { font-size: 10px; color: #fff; text-align: center; max-width: 50px; overflow: hidden; text-overflow: ellipsis; }
+        .embed-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: #000; }
+        .embed-container iframe { width: 100%; height: 100%; border: none; }
+        .embed-close { position: absolute; bottom: 10px; right: 10px; width: 36px; height: 36px; background: #ef4444; border: none; border-radius: 50%; color: white; font-size: 20px; cursor: pointer; z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        @keyframes buttonPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(247,147,26,0.4); } 50% { transform: scale(1.02); box-shadow: 0 0 10px 3px rgba(247,147,26,0.3); } }
+        .anim-buttonPulse { animation: buttonPulse 1.5s ease-in-out infinite; }
         ${includeRefreshButton ? `.refresh-button { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(247,147,26,0.9); color: #000; padding: 10px 20px; border-radius: 8px; cursor: pointer; font-weight: 700; font-size: 14px; z-index: 10000; display: none; }
         @media (orientation: portrait) { .refresh-button { display: block; } }
         .refresh-button:active { background: rgba(247,147,26,1); transform: translateX(-50%) scale(0.95); }` : ''}
@@ -2177,8 +3102,8 @@
 <body>
     <div id="game" class="canvas"></div>
     <div id="inventory" class="inventory-display" style="display:none"></div>
+    ${bgmSettings && bgmSettings.url ? '<audio id="bgm" ' + (bgmSettings.loop !== false ? 'loop ' : '') + 'preload="auto"><source src="' + bgmSettings.url + '"></audio>' : ''}
     ${includeRefreshButton ? '<div class="refresh-button" onclick="refreshCurrentStep()">⟳ Refresh Step</div>' : ''}
-    <div id="varying" style="position:fixed;top:20px;left:20px;background:rgba(0,0,0,0.8);padding:10px;border-radius:8px;display:none;flex-direction:column;gap:5px;z-index:100"></div>
     <script>
 // Story data - properly formatted with indentation for readability
 const STORY_DATA = ${JSON.stringify({ steps, inventoryItems: inventory, varyingItems: varyingItems || [] }, null, 2)};
@@ -2199,7 +3124,70 @@ let draggedElem = null;
 let dragOffset = { x: 0, y: 0 };
 let dragPos = { x: 0, y: 0 };
 const OPTIMIZE_VIDEO = ${optimizeVideoLoading};
-let stepHistory = []; // Track last visited steps
+const STORAGE_KEY = "${storageKey}";
+let stepHistory = [];
+let showInvDisplay = true;
+let showVaryDisplay = true;
+let activeEmbed = null;
+
+// BGM Functions
+function playBGM() {
+    const bgm = document.getElementById("bgm");
+    if (bgm) {
+        bgm.volume = ${(bgmSettings.volume || 100) / 100};
+        bgm.play().catch(() => {});
+    }
+}
+
+function stopBGM() {
+    const bgm = document.getElementById("bgm");
+    if (bgm) {
+        bgm.pause();
+        bgm.currentTime = 0;
+    }
+}
+
+function showEmbed(elemId) {
+    const s = STEPS.find(x => x.id === current);
+    const elem = s.elements.find(e => e.id === elemId);
+    if (!elem || !elem.embedUrl) return;
+    
+    activeEmbed = elemId;
+    const game = document.getElementById("game");
+    const container = document.createElement("div");
+    container.className = "embed-container";
+    container.id = "embed-" + elemId;
+    
+    const delay = elem.embedCloseDelay || 0;
+    const buttonStyle = delay > 0 ? 'display:none;' : '';
+    const buttonId = 'embed-close-' + elemId;
+    
+    container.innerHTML = '<iframe src="' + elem.embedUrl + '" ' + (elem.embedAllowNavigation ? '' : 'sandbox="allow-scripts allow-same-origin"') + '></iframe>' +
+        '<button id="' + buttonId + '" class="embed-close" style="' + buttonStyle + '" onclick="closeEmbed(\\'' + elemId + '\\')">✕</button>';
+    game.appendChild(container);
+    
+    // Show close button after delay
+    if (delay > 0) {
+        setTimeout(() => {
+            const btn = document.getElementById(buttonId);
+            if (btn) btn.style.display = 'flex';
+        }, delay * 1000);
+    }
+}
+
+function closeEmbed(elemId) {
+    const container = document.getElementById("embed-" + elemId);
+    if (container) container.remove();
+    activeEmbed = null;
+    
+    // Trigger onEmbedClose events
+    const s = STEPS.find(x => x.id === current);
+    s.events.forEach(ev => {
+        if (ev.trigger.type === "onEmbedClose" && ev.trigger.sourceElement === elemId && checkCond(ev.condition)) {
+            exec(ev.actions);
+        }
+    });
+}
 
 function cleanupOldMedia() {
     // Keep last 2 steps in history, clean up everything older
@@ -2380,8 +3368,20 @@ function showElem(id) {
 
 function checkCond(c) {
     if (!c) return true;
-    if (c.type === "hasItem") return inventory.includes(c.item);
-    if (c.type === "notHasItem") return !inventory.includes(c.item);
+    if (c.type === "hasItem") {
+        const items = c.items || (c.item ? [c.item] : []);
+        if (items.length === 0) return true;
+        const logic = c.logic || 'any';
+        if (logic === 'all') return items.every(i => inventory.includes(i));
+        return items.some(i => inventory.includes(i));
+    }
+    if (c.type === "notHasItem") {
+        const items = c.items || (c.item ? [c.item] : []);
+        if (items.length === 0) return true;
+        const logic = c.logic || 'any';
+        if (logic === 'all') return !items.every(i => inventory.includes(i));
+        return items.every(i => !inventory.includes(i));
+    }
     if (c.type === "varyingAtLeast") return (varyingValues[c.item] || 0) >= (c.amount || 0);
     if (c.type === "varyingAtMost") return (varyingValues[c.item] || 0) <= (c.amount || 0);
     if (c.type === "varyingBetween") return (varyingValues[c.item] || 0) >= (c.min || 0) && (varyingValues[c.item] || 0) <= (c.max || 0);
@@ -2407,6 +3407,29 @@ function exec(acts) {
         else if (a.type === "removeItem") inventory = inventory.filter(x => x !== a.target);
         else if (a.type === "addVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) + (a.amount || 0);
         else if (a.type === "subtractVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) - (a.amount || 0);
+        else if (a.type === "setVarying") varyingValues[a.target] = a.amount || 0;
+        else if (a.type === "bgmPlay") playBGM();
+        else if (a.type === "bgmStop") stopBGM();
+        else if (a.type === "showInventory") { showInvDisplay = true; }
+        else if (a.type === "hideInventory") { showInvDisplay = false; }
+        else if (a.type === "showVarying") { showVaryDisplay = true; }
+        else if (a.type === "hideVarying") { showVaryDisplay = false; }
+        else if (a.type === "saveState") {
+            const saveData = { stepId: current, inventory: inventory, varying: varyingValues };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+        }
+        else if (a.type === "loadState") {
+            const saveData = localStorage.getItem(STORAGE_KEY);
+            if (saveData) {
+                const parsed = JSON.parse(saveData);
+                inventory = parsed.inventory || [];
+                varyingValues = parsed.varying || {};
+                if (parsed.stepId) { current = parsed.stepId; render(); return; }
+            }
+        }
+        else if (a.type === "clearState") {
+            localStorage.removeItem(STORAGE_KEY);
+        }
     });
     updateInventory();
 }
@@ -2444,9 +3467,18 @@ function createElemHTML(e, withTransition) {
     if (e.type === "text") {
         const bgOpacity = e.textBgOpacity !== undefined ? e.textBgOpacity : 0.8;
         const bgColor = hexToRgba(e.textBgColor || '#000000', bgOpacity);
-        h += '<div class="elem-text" style="font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + bgColor + '">' + e.content + '</div>';
+        const textStyle = 'font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + bgColor + 
+            (e.textBold ? ';font-weight:bold' : '') + 
+            (e.textItalic ? ';font-style:italic' : '') + 
+            (e.textUnderline ? ';text-decoration:underline' : '') +
+            (e.textBorder ? ';border:' + (e.textBorderWidth || 2) + 'px solid ' + (e.textBorderColor || '#ffffff') : '');
+        h += '<div class="elem-text" style="' + textStyle + '">' + e.content + '</div>';
     }
-    if (e.type === "button") h += '<div class="elem-button" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px">' + (e.content || "Button") + '</div>';
+    if (e.type === "button") {
+        const shadowStyle = e.buttonShadow ? 'box-shadow:0 4px 15px rgba(0,0,0,0.4);' : '';
+        const pulseClass = e.buttonPulse ? ' anim-buttonPulse' : '';
+        h += '<div class="elem-button' + pulseClass + '" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px;' + shadowStyle + '">' + (e.content || "Button") + '</div>';
+    }
     if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\\'' + e.id + '\\')"><source src="' + e.content + '"></audio>';
     if (e.type === "timer") h += '<div class="elem-timer">' + (timerCountdowns[e.id] !== undefined ? timerCountdowns[e.id] : e.countdown) + '</div>';
     if (e.type === "draggable") {
@@ -2454,6 +3486,13 @@ function createElemHTML(e, withTransition) {
         else h += '<div style="font-size:' + e.fontSize + 'px;color:#fff;pointer-events:none">' + (e.content || "📦") + '</div>';
     }
     if (e.type === "object") h += '';
+    if (e.type === "embed" && e.embedUrl) {
+        if (e.embedThumbnail) {
+            h += '<img src="' + e.embedThumbnail + '" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="showEmbed(\\'' + e.id + '\\')">';
+        } else {
+            h += '<div style="width:100%;height:100%;background:rgba(128,0,255,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;cursor:pointer" onclick="showEmbed(\\'' + e.id + '\\')">▶ Click to Open</div>';
+        }
+    }
     h += '</div>';
     return h;
 }
@@ -2503,32 +3542,31 @@ function fullDraw() {
 
 function updateInventory() {
     const inv = document.getElementById("inventory");
-    const visInv = inventory.filter(item => {
+    const visInv = showInvDisplay ? inventory.filter(item => {
         const invItem = INVENTORY_ITEMS.find(i => (i.name || i) === item);
-        return !invItem || (typeof invItem === "string") || invItem.visible;
-    });
-    if (visInv.length > 0) {
+        if (!invItem) return false;
+        if (typeof invItem === "string") return true;
+        return invItem.visible !== false;
+    }) : [];
+    const visVarying = showVaryDisplay ? VARYING_ITEMS.filter(vi => vi.visible !== false) : [];
+    
+    if (visInv.length > 0 || visVarying.length > 0) {
         inv.style.display = "flex";
-        inv.innerHTML = visInv.map(x => '<div style="width:40px;height:40px;background:#f7931a;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px">' + x[0] + '</div>').join("");
+        let html = "";
+        // Inventory items as text
+        visInv.forEach(itemName => {
+            const invItem = INVENTORY_ITEMS.find(i => (i.name || i) === itemName);
+            const displayName = invItem && invItem.displayName ? invItem.displayName : itemName;
+            html += '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold"><span style="color:#fff">• ' + displayName + '</span></div>';
+        });
+        // Varying items
+        visVarying.forEach(vi => {
+            const displayName = vi.displayName || vi.name;
+            html += '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold"><span style="color:#fff">' + displayName + ':</span><span>' + (varyingValues[vi.name] || 0) + '</span></div>';
+        });
+        inv.innerHTML = html;
     } else {
         inv.style.display = "none";
-    }
-    updateVarying();
-}
-
-function updateVarying() {
-    const vd = document.getElementById("varying");
-    const visVarying = VARYING_ITEMS.filter(vi => vi.visible);
-    if (visVarying.length > 0) {
-        vd.style.display = "flex";
-        vd.innerHTML = visVarying.map(vi => 
-            '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold">' +
-            '<span style="color:#fff">' + vi.name + ':</span>' +
-            '<span>' + (varyingValues[vi.name] || 0) + '</span>' +
-            '</div>'
-        ).join("");
-    } else {
-        vd.style.display = "none";
     }
 }
 
@@ -2621,7 +3659,10 @@ function handleClick(id) {
     
     const s = STEPS.find(x => x.id === current);
     s.events.forEach(ev => {
-        if (ev.trigger.type === "onClick" && ev.trigger.sourceElement === id && checkCond(ev.condition)) exec(ev.actions);
+        if (ev.trigger.type === "onClick") {
+            const sources = ev.trigger.sourceElements || (ev.trigger.sourceElement ? [ev.trigger.sourceElement] : []);
+            if (sources.includes(id) && checkCond(ev.condition)) exec(ev.actions);
+        }
     });
 }
 
