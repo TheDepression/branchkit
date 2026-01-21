@@ -1,1457 +1,1435 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Story</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Sense Test</title>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { background: #000; overflow: hidden; }
-        .canvas { width: 1024px; height: 576px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-        @media (orientation: landscape) { .canvas { width: 870px; height: 490px; } }
-        .elem { position: absolute; }
-        .elem img, .elem video { width: 100%; height: 100%; object-fit: cover; }
-        .elem video { pointer-events: none; }
-        .elem video::-webkit-media-controls { display: none !important; }
-        .elem video::-webkit-media-controls-enclosure { display: none !important; }
-        .elem-text { padding: 15px; border-radius: 6px; text-align: center; white-space: pre-wrap; }
-        .elem-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
-        .elem-timer { background: rgba(247,147,26,0.8); color: #fff; font-size: 3rem; font-weight: 900; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-family: monospace; }
-        .elem-draggable { cursor: grab; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: none; }
-        .elem-draggable:active { cursor: grabbing; }
-        .elem-draggable img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
-        .elem-hotspot-visible { border: 3px dashed rgba(255,0,0,0.5); background: rgba(255,0,0,0.05); }
-        .inventory-display { position: fixed; bottom:20px;left:20px; background: rgba(0,0,0,0.8); padding: 10px 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; z-index: 100; min-width: 120px; }
-        .inventory-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
-        .inventory-item-icon { width: 40px; height: 40px; background: #f7931a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
-        .inventory-item-name { font-size: 10px; color: #fff; text-align: center; max-width: 50px; overflow: hidden; text-overflow: ellipsis; }
-        .embed-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: #000; }
-        .embed-container iframe { width: 100%; height: 100%; border: none; }
-        .embed-close { position: absolute; bottom: 10px; right: 10px; width: 36px; height: 36px; background: #ef4444; border: none; border-radius: 50%; color: white; font-size: 20px; cursor: pointer; z-index: 10000; display: flex; align-items: center; justify-content: center; }
-        @keyframes buttonPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(247,147,26,0.4); } 50% { transform: scale(1.02); box-shadow: 0 0 10px 3px rgba(247,147,26,0.3); } }
-        .anim-buttonPulse { animation: buttonPulse 1.5s ease-in-out infinite; }
-        
-        .trans-fade { animation: fadeIn 0.5s ease-in forwards; }
-        .trans-fade-out { animation: fadeOut 0.5s ease-out forwards; }
-        .trans-slideLeft { animation: slideLeft 0.5s ease-out forwards; }
-        .trans-slideLeft-out { animation: slideLeftOut 0.5s ease-in forwards; }
-        .trans-slideRight { animation: slideRight 0.5s ease-out forwards; }
-        .trans-slideRight-out { animation: slideRightOut 0.5s ease-in forwards; }
-        .trans-slideUp { animation: slideUp 0.5s ease-out forwards; }
-        .trans-slideUp-out { animation: slideUpOut 0.5s ease-in forwards; }
-        .trans-slideDown { animation: slideDown 0.5s ease-out forwards; }
-        .trans-slideDown-out { animation: slideDownOut 0.5s ease-in forwards; }
-        .trans-zoom { animation: zoomIn 0.5s ease-out forwards; }
-        .trans-zoom-out { animation: zoomOut 0.5s ease-in forwards; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
-        @keyframes slideLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes slideLeftOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-100%); opacity: 0; } }
-        @keyframes slideRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-        @keyframes slideRightOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
-        @keyframes slideUp { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes slideUpOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
-        @keyframes slideDown { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        @keyframes slideDownOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }
-        @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes zoomOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0); opacity: 0; } }
-        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
-        @keyframes wobble { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
-        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); } 20%, 40%, 60%, 80% { transform: translateX(2px); } }
-        @keyframes glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-        .anim-pulse { animation: pulse 1s ease-in-out infinite; }
-        .anim-spin { animation: spin 2s linear infinite; }
-        .anim-bounce { animation: bounce 0.5s ease-in-out infinite; }
-        .anim-wobble { animation: wobble 0.5s ease-in-out infinite; }
-        .anim-shake { animation: shake 0.5s ease-in-out infinite; }
-        .anim-glow { animation: glow 1.5s ease-in-out infinite; }
-        .anim-float { animation: float 2s ease-in-out infinite; }
-        .elem-object { display: flex; align-items: center; justify-content: center; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Quicksand', sans-serif;
+            background: #ffffff;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        #app {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        /* Name Entry Screen */
+        #nameScreen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            padding: 20px;
+        }
+
+        #nameScreen h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2rem, 8vw, 4rem);
+            color: #333;
+            text-align: center;
+        }
+
+        #nameScreen input {
+            font-family: 'Quicksand', sans-serif;
+            font-size: 1.2rem;
+            padding: 15px 25px;
+            border: 2px solid #ddd;
+            border-radius: 50px;
+            outline: none;
+            text-align: center;
+            width: 280px;
+            transition: border-color 0.3s;
+        }
+
+        #nameScreen input:focus {
+            border-color: #ff8c00;
+        }
+
+        #nameScreen button {
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 600;
+            font-size: 1.2rem;
+            padding: 15px 50px;
+            background: linear-gradient(135deg, #ff8c00, #ff6b00);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);
+        }
+
+        #nameScreen button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(255, 140, 0, 0.5);
+        }
+
+        /* Menu Screen */
+        #menuScreen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            height: 100%;
+            padding: 60px 20px 40px;
+        }
+
+        .title-container {
+            text-align: center;
+        }
+
+        .main-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 12vw, 6rem);
+            color: #333;
+            animation: pulse 2s ease-in-out infinite;
+            background: linear-gradient(135deg, #333 0%, #666 50%, #333 100%);
+            background-size: 200% 200%;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: pulse 2s ease-in-out infinite, shimmer 3s linear infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.9; }
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+
+        .start-btn {
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 600;
+            font-size: clamp(1.5rem, 5vw, 2rem);
+            padding: 25px 80px;
+            background: linear-gradient(135deg, #ff8c00, #ff6b00);
+            color: white;
+            border: none;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 8px 30px rgba(255, 140, 0, 0.5);
+        }
+
+        .start-btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 12px 40px rgba(255, 140, 0, 0.6);
+        }
+
+        .start-btn:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        .bottom-info {
+            text-align: center;
+            color: #666;
+        }
+
+        .player-name {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+
+        .best-score {
+            font-size: 1rem;
+            color: #ff8c00;
+            font-weight: 600;
+        }
+
+        .home-link {
+            margin-top: 15px;
+        }
+
+        .home-link a {
+            color: #999;
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .home-link a:hover {
+            color: #ff8c00;
+        }
+
+        /* Game Canvas Screen */
+        #gameScreen {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #ffffff;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .game-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .game-instruction {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(1.5rem, 5vw, 2.5rem);
+            color: #333;
+            text-align: center;
+            max-width: 90%;
+            transition: opacity 0.5s;
+        }
+
+        .game-subtitle {
+            font-size: clamp(1rem, 3vw, 1.3rem);
+            color: #666;
+            margin-top: 15px;
+            text-align: center;
+        }
+
+        .timer-display {
+            font-family: 'Quicksand', sans-serif;
+            font-size: clamp(4rem, 15vw, 8rem);
+            font-weight: 600;
+            color: #333;
+            transition: opacity 2s;
+        }
+
+        .score-popup {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(3rem, 10vw, 5rem);
+            color: #ff8c00;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 20;
+        }
+
+        .score-popup.show {
+            opacity: 1;
+        }
+
+        /* Stage indicator */
+        .stage-indicator {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.9rem;
+            color: #999;
+            z-index: 15;
+        }
+
+        /* Results Screen */
+        #resultsScreen {
+            display: none;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 30px;
+            padding: 40px 20px;
+        }
+
+        .results-title {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2rem, 8vw, 3.5rem);
+            color: #333;
+        }
+
+        .final-score {
+            font-family: 'Quicksand', sans-serif;
+            font-size: clamp(4rem, 15vw, 7rem);
+            font-weight: 600;
+            color: #ff8c00;
+        }
+
+        .score-breakdown {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: center;
+            color: #666;
+        }
+
+        .score-item {
+            font-size: 1rem;
+        }
+
+        .play-again-btn {
+            font-family: 'Quicksand', sans-serif;
+            font-weight: 600;
+            font-size: 1.2rem;
+            padding: 18px 60px;
+            background: linear-gradient(135deg, #ff8c00, #ff6b00);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 6px 25px rgba(255, 140, 0, 0.4);
+            margin-top: 20px;
+        }
+
+        .play-again-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(255, 140, 0, 0.5);
+        }
+
+        .new-record {
+            font-size: 1.2rem;
+            color: #4CAF50;
+            font-weight: 600;
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        /* Rabbit track */
+        .rabbit-track {
+            position: absolute;
+            pointer-events: none;
+        }
+
+        .rabbit {
+            font-size: 40px;
+            position: absolute;
+            transition: opacity 2s;
+        }
+
+        /* Touch indicator */
+        .touch-indicator {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: rgba(255, 140, 0, 0.5);
+            border-radius: 50%;
+            pointer-events: none;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Reference line for stage 2 */
+        .reference-line {
+            position: absolute;
+            height: 4px;
+            background: #333;
+            border-radius: 2px;
+            transition: opacity 1s;
+        }
+
+        /* Guide circle for stage 3 */
+        .guide-circle {
+            position: absolute;
+            border: 3px dashed #ccc;
+            border-radius: 50%;
+            pointer-events: none;
+            transition: opacity 1s;
+        }
+
+        .start-dot {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #ff8c00;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        /* Countdown display */
+        .countdown {
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(5rem, 20vw, 10rem);
+            color: #333;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 25;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .fade-out {
+            opacity: 0 !important;
+        }
     </style>
 </head>
 <body>
-    <div id="game" class="canvas"></div>
-    <div id="inventory" class="inventory-display" style="display:none"></div>
-    <audio id="bgm" loop preload="auto"><source src="https://music.hirakatajin.com/Magical%20pond.m4a"></audio>
-    
+    <div id="app">
+        <!-- Name Entry Screen -->
+        <div id="nameScreen">
+            <h1>Welcome to<br>Sense Test</h1>
+            <input type="text" id="nameInput" placeholder="Enter your name" maxlength="20">
+            <button id="nameSubmit">Let's Go!</button>
+        </div>
+
+        <!-- Menu Screen -->
+        <div id="menuScreen">
+            <div class="title-container">
+                <h1 class="main-title">Sense Test</h1>
+            </div>
+            <button class="start-btn" id="startBtn">Start</button>
+            <div class="bottom-info">
+                <div class="player-name">Player: <span id="displayName"></span></div>
+                <div class="best-score">Best Score: <span id="bestScore">--</span>%</div>
+                <div class="home-link">
+                    <a href="https://hirakatajin.com">← Back to Homepage</a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Screen -->
+        <div id="gameScreen">
+            <canvas id="gameCanvas"></canvas>
+            <div class="stage-indicator" id="stageIndicator"></div>
+            <div class="game-overlay" id="gameOverlay">
+                <div class="game-instruction" id="gameInstruction"></div>
+                <div class="game-subtitle" id="gameSubtitle"></div>
+            </div>
+            <div class="timer-display hidden" id="timerDisplay">0.0</div>
+            <div class="score-popup" id="scorePopup"></div>
+            <div class="countdown hidden" id="countdown"></div>
+        </div>
+
+        <!-- Results Screen -->
+        <div id="resultsScreen">
+            <h1 class="results-title">Final Results</h1>
+            <div class="final-score" id="finalScore">0%</div>
+            <div class="new-record hidden" id="newRecord">🎉 New Personal Best! 🎉</div>
+            <div class="score-breakdown" id="scoreBreakdown"></div>
+            <button class="play-again-btn" id="playAgainBtn">Play Again</button>
+            <div class="home-link">
+                <a href="https://hirakatajin.com">← Back to Homepage</a>
+            </div>
+        </div>
+    </div>
+
+    <audio id="bgm" loop>
+        <source src="https://music.hirakatajin.com/Magical%20pond.m4a" type="audio/mp4">
+    </audio>
+
     <script>
-// Story data - properly formatted with indentation for readability
-const STORY_DATA = {
-  "steps": [
-    {
-      "id": "step_1769010749227_g1f39ptb8",
-      "title": "Step 1",
-      "elements": [
-        {
-          "id": "image_2",
-          "type": "image",
-          "label": "color",
-          "x": 0,
-          "y": 0,
-          "width": 1024,
-          "height": 576,
-          "content": "http://satmis.hirakatajin.com/orange.png",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "image_1",
-          "type": "image",
-          "label": "frame",
-          "x": 0,
-          "y": 0,
-          "width": 1024,
-          "height": 576,
-          "content": "http://satmis.hirakatajin.com/frame.png",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "text_1",
-          "type": "text",
-          "label": "text1",
-          "x": 153.60000000000002,
-          "y": 51.2,
-          "width": 300,
-          "height": 100,
-          "content": "Potato",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "slideUp",
-          "transitionDuration": 1,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "#ffffff",
-          "textSize": 55,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 0.01,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "text_2",
-          "type": "text",
-          "label": "text1_copy",
-          "x": 307.20000000000005,
-          "y": 51.2,
-          "width": 300,
-          "height": 100,
-          "content": "Guy",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "slideUp",
-          "transitionDuration": 2,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "#ffffff",
-          "textSize": 55,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 0.01,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "text_3",
-          "type": "text",
-          "label": "text1_copy_copy",
-          "x": 512,
-          "y": 51.2,
-          "width": 300,
-          "height": 100,
-          "content": "Adventure",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "slideUp",
-          "transitionDuration": 3,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "#ffffff",
-          "textSize": 55,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 0.01,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "audio_1",
-          "type": "audio",
-          "label": "audio1",
-          "x": 307.20000000000005,
-          "y": 256,
-          "width": 200,
-          "height": 60,
-          "content": "https://github.com/TheDepression/Sounds/raw/refs/heads/main/Convo/Blk1.m4a",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": true,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "button_1",
-          "type": "button",
-          "label": "step2 btn",
-          "x": 563.2,
-          "y": 204.8,
-          "width": 300,
-          "height": 60,
-          "content": "Go to step 2",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "button_2",
-          "type": "button",
-          "label": "Start audio btn",
-          "x": 563.2,
-          "y": 307.20000000000005,
-          "width": 300,
-          "height": 60,
-          "content": "Play audio",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "button_3",
-          "type": "button",
-          "label": "stop audio btn",
-          "x": 563.2,
-          "y": 409.6,
-          "width": 300,
-          "height": 60,
-          "content": "Stop audio",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
+        // Game State
+        const state = {
+            playerName: '',
+            bestScore: null,
+            currentStage: 0,
+            scores: [0, 0, 0, 0],
+            bgmStarted: false
+        };
+
+        // DOM Elements
+        const nameScreen = document.getElementById('nameScreen');
+        const menuScreen = document.getElementById('menuScreen');
+        const gameScreen = document.getElementById('gameScreen');
+        const resultsScreen = document.getElementById('resultsScreen');
+        const nameInput = document.getElementById('nameInput');
+        const nameSubmit = document.getElementById('nameSubmit');
+        const displayName = document.getElementById('displayName');
+        const bestScoreEl = document.getElementById('bestScore');
+        const startBtn = document.getElementById('startBtn');
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const gameOverlay = document.getElementById('gameOverlay');
+        const gameInstruction = document.getElementById('gameInstruction');
+        const gameSubtitle = document.getElementById('gameSubtitle');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const scorePopup = document.getElementById('scorePopup');
+        const stageIndicator = document.getElementById('stageIndicator');
+        const countdown = document.getElementById('countdown');
+        const finalScore = document.getElementById('finalScore');
+        const scoreBreakdown = document.getElementById('scoreBreakdown');
+        const newRecord = document.getElementById('newRecord');
+        const playAgainBtn = document.getElementById('playAgainBtn');
+        const bgm = document.getElementById('bgm');
+
+        // Initialize
+        function init() {
+            loadData();
+            setupCanvas();
+            setupEventListeners();
+
+            if (state.playerName) {
+                showMenu();
+            } else {
+                showNameScreen();
+            }
         }
-      ],
-      "events": [
-        {
-          "id": "event_1769011443098",
-          "trigger": {
-            "type": "onLoad",
-            "delay": 0,
-            "sourceElement": ""
-          },
-          "condition": null,
-          "actions": [
-            {
-              "id": "action_1769011445749",
-              "type": "bgmPlay",
-              "target": "",
-              "value": ""
-            },
-            {
-              "id": "action_1769012763562",
-              "type": "hide",
-              "target": "",
-              "value": "",
-              "targets": [
-                "audio_1"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "event_1769012793660",
-          "trigger": {
-            "type": "onClick",
-            "delay": 0,
-            "sourceElement": "",
-            "sourceElements": [
-              "button_1"
-            ]
-          },
-          "condition": null,
-          "actions": [
-            {
-              "id": "action_1769012874229",
-              "type": "goto",
-              "target": "",
-              "value": "",
-              "targets": [
-                "step_1769011247417_a2w6qwp0q"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "event_1769012881644",
-          "trigger": {
-            "type": "onClick",
-            "delay": 0,
-            "sourceElement": "",
-            "sourceElements": [
-              "button_2"
-            ]
-          },
-          "condition": null,
-          "actions": [
-            {
-              "id": "action_1769012886176",
-              "type": "show",
-              "target": "",
-              "value": "",
-              "targets": [
-                "audio_1"
-              ]
-            }
-          ]
-        },
-        {
-          "id": "event_1769012896492",
-          "trigger": {
-            "type": "onClick",
-            "delay": 0,
-            "sourceElement": "",
-            "sourceElements": [
-              "button_3"
-            ]
-          },
-          "condition": null,
-          "actions": [
-            {
-              "id": "action_1769012904178",
-              "type": "hide",
-              "target": "",
-              "value": "",
-              "targets": [
-                "audio_1"
-              ]
-            }
-          ]
+
+        function loadData() {
+            state.playerName = localStorage.getItem('senseTestName') || '';
+            const saved = localStorage.getItem('senseTestBest');
+            state.bestScore = saved ? parseFloat(saved) : null;
         }
-      ],
-      "password": "",
-      "wrongPasswordStep": "",
-      "bgColor": "#000000",
-      "bgShapes": [],
-      "folderId": null
-    },
-    {
-      "id": "step_1769011247417_a2w6qwp0q",
-      "title": "Step 1 2",
-      "elements": [
-        {
-          "id": "image_2",
-          "type": "image",
-          "label": "image2",
-          "x": 0,
-          "y": 0,
-          "width": 1024,
-          "height": 576,
-          "content": "http://satmis.hirakatajin.com/lightblueblue.png",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "image_1",
-          "type": "image",
-          "label": "image1",
-          "x": 0,
-          "y": 0,
-          "width": 523.1304347826087,
-          "height": 576,
-          "content": "http://satmis.hirakatajin.com/frame.png",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "button_1",
-          "type": "button",
-          "label": "stp1 btn",
-          "x": 100,
-          "y": 100,
-          "width": 300,
-          "height": 60,
-          "content": "Go back",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": true,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "button_2",
-          "type": "button",
-          "label": "stop bgm btn",
-          "x": 512,
-          "y": 102.4,
-          "width": 300,
-          "height": 60,
-          "content": "stop bgm",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": true,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
-          "id": "image_3",
-          "type": "image",
-          "label": "image1_copy",
-          "x": 0,
-          "y": 0,
-          "width": 1024,
-          "height": 268.9192546583851,
-          "content": "http://satmis.hirakatajin.com/frame.png",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        }
-      ],
-      "events": [
-        {
-          "id": "event_1769013033060",
-          "trigger": {
-            "type": "onClick",
-            "delay": 0,
-            "sourceElement": "",
-            "sourceElements": [
-              "button_1"
-            ]
-          },
-          "condition": null,
-          "actions": [
-            {
-              "id": "action_1769013044311",
-              "type": "goto",
-              "target": "",
-              "value": "",
-              "targets": [
-                "step_1769010749227_g1f39ptb8"
-              ]
+
+        function saveData() {
+            localStorage.setItem('senseTestName', state.playerName);
+            if (state.bestScore !== null) {
+                localStorage.setItem('senseTestBest', state.bestScore.toString());
             }
-          ]
-        },
-        {
-          "id": "event_1769013051360",
-          "trigger": {
-            "type": "onClick",
-            "delay": 0,
-            "sourceElement": "",
-            "sourceElements": [
-              "button_2"
-            ]
-          },
-          "condition": null,
-          "actions": [
-            {
-              "id": "action_1769013056492",
-              "type": "bgmStop",
-              "target": "",
-              "value": ""
+        }
+
+        function setupCanvas() {
+            const resize = () => {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            };
+            resize();
+            window.addEventListener('resize', resize);
+        }
+
+        function setupEventListeners() {
+            nameSubmit.addEventListener('click', submitName);
+            nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') submitName();
+            });
+            startBtn.addEventListener('click', startGame);
+            playAgainBtn.addEventListener('click', () => {
+                showMenu();
+            });
+        }
+
+        function submitName() {
+            const name = nameInput.value.trim();
+            if (name) {
+                state.playerName = name;
+                saveData();
+                showMenu();
             }
-          ]
         }
-      ],
-      "password": "",
-      "wrongPasswordStep": "",
-      "bgColor": "#000000",
-      "bgShapes": [],
-      "folderId": null
-    }
-  ],
-  "inventoryItems": [],
-  "varyingItems": []
-};
 
-const STEPS = STORY_DATA.steps;
-const INVENTORY_ITEMS = STORY_DATA.inventoryItems;
-const VARYING_ITEMS = STORY_DATA.varyingItems;
-
-let current = STEPS[0].id;
-let visible = {};
-let inventory = [];
-let varyingValues = {};
-let timers = [];
-let timerCountdowns = {};
-let hiding = {};
-let rendered = {};
-let draggedElem = null;
-let dragOffset = { x: 0, y: 0 };
-let dragPos = { x: 0, y: 0 };
-const OPTIMIZE_VIDEO = false;
-const STORAGE_KEY = "storyGameSave";
-let stepHistory = [];
-let showInvDisplay = true;
-let showVaryDisplay = true;
-let activeEmbed = null;
-
-// BGM Functions
-function playBGM() {
-    const bgm = document.getElementById("bgm");
-    if (bgm) {
-        bgm.volume = 1;
-        bgm.play().catch(() => {});
-    }
-}
-
-function stopBGM() {
-    const bgm = document.getElementById("bgm");
-    if (bgm) {
-        bgm.pause();
-        bgm.currentTime = 0;
-    }
-}
-
-function showEmbed(elemId) {
-    const s = STEPS.find(x => x.id === current);
-    const elem = s.elements.find(e => e.id === elemId);
-    if (!elem || !elem.embedUrl) return;
-    
-    activeEmbed = elemId;
-    const game = document.getElementById("game");
-    const container = document.createElement("div");
-    container.className = "embed-container";
-    container.id = "embed-" + elemId;
-    
-    const delay = elem.embedCloseDelay || 0;
-    const buttonStyle = delay > 0 ? 'display:none;' : '';
-    const buttonId = 'embed-close-' + elemId;
-    
-    container.innerHTML = '<iframe src="' + elem.embedUrl + '" ' + (elem.embedAllowNavigation ? '' : 'sandbox="allow-scripts allow-same-origin"') + '></iframe>' +
-        '<button id="' + buttonId + '" class="embed-close" style="' + buttonStyle + '" onclick="closeEmbed(\'' + elemId + '\')">✕</button>';
-    game.appendChild(container);
-    
-    // Show close button after delay
-    if (delay > 0) {
-        setTimeout(() => {
-            const btn = document.getElementById(buttonId);
-            if (btn) btn.style.display = 'flex';
-        }, delay * 1000);
-    }
-}
-
-function closeEmbed(elemId) {
-    const container = document.getElementById("embed-" + elemId);
-    if (container) container.remove();
-    activeEmbed = null;
-    
-    // Trigger onEmbedClose events
-    const s = STEPS.find(x => x.id === current);
-    s.events.forEach(ev => {
-        if (ev.trigger.type === "onEmbedClose" && ev.trigger.sourceElement === elemId && checkCond(ev.condition)) {
-            exec(ev.actions);
+        function showNameScreen() {
+            hideAllScreens();
+            nameScreen.style.display = 'flex';
         }
-    });
-}
 
-function cleanupOldMedia() {
-    // Keep last 2 steps in history, clean up everything older
-    if (stepHistory.length <= 2) return;
-    
-    const keepSteps = stepHistory.slice(-2); // Last 2 steps
-    const currentStepId = current;
-    
-    // Find all media elements from old steps (not in keepSteps or current)
-    const game = document.getElementById("game");
-    const allElements = game.querySelectorAll('[data-elem-id]');
-    
-    allElements.forEach(elemDiv => {
-        const elemId = elemDiv.getAttribute('data-elem-id');
-        
-        // Find which step this element belongs to
-        let belongsToOldStep = true;
-        STEPS.forEach(step => {
-            if (step.id === currentStepId || keepSteps.includes(step.id)) {
-                if (step.elements.some(e => e.id === elemId)) {
-                    belongsToOldStep = false;
+        function showMenu() {
+            hideAllScreens();
+            displayName.textContent = state.playerName;
+            bestScoreEl.textContent = state.bestScore !== null ? Math.round(state.bestScore) : '--';
+            menuScreen.style.display = 'flex';
+        }
+
+        function hideAllScreens() {
+            nameScreen.style.display = 'none';
+            menuScreen.style.display = 'none';
+            gameScreen.style.display = 'none';
+            resultsScreen.style.display = 'none';
+        }
+
+        function startBGM() {
+            if (!state.bgmStarted) {
+                bgm.volume = 0.4;
+                bgm.play().catch(() => {});
+                state.bgmStarted = true;
+            }
+        }
+
+        function startGame() {
+            startBGM();
+            state.currentStage = 0;
+            state.scores = [0, 0, 0, 0];
+            hideAllScreens();
+            gameScreen.style.display = 'block';
+            runStage(0);
+        }
+
+        function runStage(stageNum) {
+            state.currentStage = stageNum;
+            clearCanvas();
+            
+            switch(stageNum) {
+                case 0: runTimeStage(); break;
+                case 1: runLengthStage(); break;
+                case 2: runCircleStage(); break;
+                case 3: runRabbitStage(); break;
+                default: showResults();
+            }
+        }
+
+        function clearCanvas() {
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function showStageScore(score, callback) {
+            scorePopup.textContent = Math.round(score) + ' pts';
+            scorePopup.classList.add('show');
+            
+            setTimeout(() => {
+                scorePopup.classList.remove('show');
+                setTimeout(callback, 500);
+            }, 1500);
+        }
+
+        // ==================== STAGE 1: TIME SENSE ====================
+        function runTimeStage() {
+            stageIndicator.textContent = 'Stage 1 of 4: Time Sense';
+            
+            const targetTime = Math.floor(Math.random() * 16) + 10; // 10-25 seconds
+            const maxTime = targetTime * 2;
+            
+            gameInstruction.textContent = `Hold the screen for exactly ${targetTime} seconds`;
+            gameSubtitle.textContent = 'Touch anywhere to begin';
+            gameOverlay.classList.remove('hidden');
+            timerDisplay.classList.add('hidden');
+            timerDisplay.classList.remove('fade-out');
+            
+            let startTime = null;
+            let timerInterval = null;
+            let isHolding = false;
+            let hasStarted = false;
+
+            const updateTimer = () => {
+                if (!startTime) return;
+                const elapsed = (Date.now() - startTime) / 1000;
+                timerDisplay.textContent = elapsed.toFixed(1);
+                
+                if (elapsed >= maxTime) {
+                    endHold(maxTime);
                 }
-            }
-        });
-        
-        if (belongsToOldStep) {
-            // Clean up media before removing
-            const video = elemDiv.querySelector('video');
-            const audio = elemDiv.querySelector('audio');
-            const img = elemDiv.querySelector('img');
+            };
+
+            const startHold = (e) => {
+                e.preventDefault();
+                if (hasStarted) return;
+                hasStarted = true;
+                isHolding = true;
+                startTime = Date.now();
+                
+                gameOverlay.classList.add('hidden');
+                timerDisplay.classList.remove('hidden');
+                timerDisplay.style.opacity = '1';
+                timerDisplay.textContent = '0.0';
+                
+                timerInterval = setInterval(updateTimer, 50);
+                
+                // Fade out timer after 2 seconds
+                setTimeout(() => {
+                    timerDisplay.style.opacity = '0';
+                }, 2000);
+            };
+
+            const endHold = (overrideTime = null) => {
+                if (!isHolding || !startTime) return;
+                isHolding = false;
+                
+                clearInterval(timerInterval);
+                
+                const elapsed = overrideTime || (Date.now() - startTime) / 1000;
+                const diff = Math.abs(elapsed - targetTime);
+                const maxDiff = targetTime; // 100% off = 0 points
+                
+                let score;
+                if (diff >= maxDiff) {
+                    score = 0;
+                } else {
+                    score = Math.max(0, 100 - (diff / targetTime) * 100);
+                }
+                
+                state.scores[0] = score;
+                
+                canvas.removeEventListener('mousedown', startHold);
+                canvas.removeEventListener('touchstart', startHold);
+                canvas.removeEventListener('mouseup', endHold);
+                canvas.removeEventListener('touchend', endHold);
+                
+                timerDisplay.classList.add('hidden');
+                gameSubtitle.textContent = `Target: ${targetTime}s | Your time: ${elapsed.toFixed(1)}s`;
+                gameOverlay.classList.remove('hidden');
+                gameInstruction.textContent = '';
+                
+                showStageScore(score, () => runStage(1));
+            };
+
+            canvas.addEventListener('mousedown', startHold);
+            canvas.addEventListener('touchstart', startHold);
+            canvas.addEventListener('mouseup', () => endHold());
+            canvas.addEventListener('touchend', () => endHold());
+        }
+
+        // ==================== STAGE 2: LENGTH SENSE ====================
+        function runLengthStage() {
+            stageIndicator.textContent = 'Stage 2 of 4: Length Sense';
             
-            if (video) {
-                video.pause();
-                video.removeAttribute('src');
-                video.load(); // Forces browser to release memory
-            }
-            if (audio) {
-                audio.pause();
-                audio.removeAttribute('src');
-                audio.load();
-            }
-            if (img) {
-                img.removeAttribute('src');
+            const targetLength = Math.floor(Math.random() * 501) + 200; // 200-700px
+            let phase = 'show'; // show, draw
+            let drawPoints = [];
+            let isDrawing = false;
+
+            // Show reference line (100px)
+            gameInstruction.textContent = 'This line is 100 pixels long';
+            gameSubtitle.textContent = 'Remember this length...';
+            gameOverlay.classList.remove('hidden');
+            
+            clearCanvas();
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            const refY = canvas.height / 2;
+            const refX = (canvas.width - 100) / 2;
+            ctx.moveTo(refX, refY);
+            ctx.lineTo(refX + 100, refY);
+            ctx.stroke();
+
+            setTimeout(() => {
+                phase = 'draw';
+                clearCanvas();
+                gameInstruction.textContent = `Draw a line ${targetLength} pixels long`;
+                gameSubtitle.textContent = 'Touch and drag to draw';
+            }, 5000);
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                if (e.touches) {
+                    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                }
+                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            };
+
+            const startDraw = (e) => {
+                if (phase !== 'draw') return;
+                e.preventDefault();
+                isDrawing = true;
+                drawPoints = [getPos(e)];
+                gameOverlay.classList.add('hidden');
+            };
+
+            const moveDraw = (e) => {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const pos = getPos(e);
+                drawPoints.push(pos);
+                
+                // Draw the line
+                clearCanvas();
+                ctx.strokeStyle = '#ff8c00';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(drawPoints[0].x, drawPoints[0].y);
+                for (let i = 1; i < drawPoints.length; i++) {
+                    ctx.lineTo(drawPoints[i].x, drawPoints[i].y);
+                }
+                ctx.stroke();
+            };
+
+            const endDraw = (e) => {
+                if (!isDrawing) return;
+                isDrawing = false;
+                
+                // Calculate total length
+                let totalLength = 0;
+                for (let i = 1; i < drawPoints.length; i++) {
+                    const dx = drawPoints[i].x - drawPoints[i-1].x;
+                    const dy = drawPoints[i].y - drawPoints[i-1].y;
+                    totalLength += Math.sqrt(dx * dx + dy * dy);
+                }
+                
+                const diff = Math.abs(totalLength - targetLength);
+                const maxDiff = targetLength;
+                
+                let score;
+                if (diff >= maxDiff) {
+                    score = 0;
+                } else {
+                    score = Math.max(0, 100 - (diff / targetLength) * 100);
+                }
+                
+                state.scores[1] = score;
+                
+                canvas.removeEventListener('mousedown', startDraw);
+                canvas.removeEventListener('touchstart', startDraw);
+                canvas.removeEventListener('mousemove', moveDraw);
+                canvas.removeEventListener('touchmove', moveDraw);
+                canvas.removeEventListener('mouseup', endDraw);
+                canvas.removeEventListener('touchend', endDraw);
+                
+                gameSubtitle.textContent = `Target: ${targetLength}px | Your line: ${Math.round(totalLength)}px`;
+                gameOverlay.classList.remove('hidden');
+                gameInstruction.textContent = '';
+                
+                showStageScore(score, () => runStage(2));
+            };
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('touchstart', startDraw);
+            canvas.addEventListener('mousemove', moveDraw);
+            canvas.addEventListener('touchmove', moveDraw);
+            canvas.addEventListener('mouseup', endDraw);
+            canvas.addEventListener('touchend', endDraw);
+        }
+
+        // ==================== STAGE 3: SHAPE SENSE ====================
+        function runCircleStage() {
+            stageIndicator.textContent = 'Stage 3 of 4: Shape Sense';
+            
+            const centerX = canvas.width / 2;
+            const centerY = canvas.height / 2;
+            const baseSize = Math.min(canvas.width, canvas.height) * 0.35;
+            const trackWidth = 20;
+            
+            // Randomly select a shape
+            const shapes = ['circle', 'square', 'triangle', 'oval', 'rectangle'];
+            const selectedShape = shapes[Math.floor(Math.random() * shapes.length)];
+            
+            let phase = 'show';
+            let drawPoints = [];
+            let isDrawing = false;
+            let shapePoints = []; // Points that define the shape path
+            let startPoint = { x: 0, y: 0 };
+
+            gameInstruction.textContent = `Draw a perfect ${selectedShape}`;
+            gameSubtitle.textContent = 'Start at the orange dot, go clockwise';
+            gameOverlay.classList.remove('hidden');
+
+            // Generate shape points and find start point
+            const generateShapePoints = () => {
+                shapePoints = [];
+                const numPoints = 360; // High resolution for smooth checking
+                
+                switch (selectedShape) {
+                    case 'circle':
+                        for (let i = 0; i <= numPoints; i++) {
+                            const angle = -Math.PI / 2 + (i / numPoints) * Math.PI * 2;
+                            shapePoints.push({
+                                x: centerX + baseSize * Math.cos(angle),
+                                y: centerY + baseSize * Math.sin(angle)
+                            });
+                        }
+                        startPoint = { x: centerX, y: centerY - baseSize };
+                        break;
+                        
+                    case 'oval':
+                        const ovalWidth = baseSize * 1.3;
+                        const ovalHeight = baseSize * 0.7;
+                        for (let i = 0; i <= numPoints; i++) {
+                            const angle = -Math.PI / 2 + (i / numPoints) * Math.PI * 2;
+                            shapePoints.push({
+                                x: centerX + ovalWidth * Math.cos(angle),
+                                y: centerY + ovalHeight * Math.sin(angle)
+                            });
+                        }
+                        startPoint = { x: centerX, y: centerY - ovalHeight };
+                        break;
+                        
+                    case 'square':
+                        const sqHalf = baseSize * 0.85;
+                        const sqCorners = [
+                            { x: centerX, y: centerY - sqHalf },      // top center (start)
+                            { x: centerX + sqHalf, y: centerY - sqHalf }, // top right
+                            { x: centerX + sqHalf, y: centerY + sqHalf }, // bottom right
+                            { x: centerX - sqHalf, y: centerY + sqHalf }, // bottom left
+                            { x: centerX - sqHalf, y: centerY - sqHalf }, // top left
+                            { x: centerX, y: centerY - sqHalf }       // back to start
+                        ];
+                        // Interpolate between corners
+                        for (let c = 0; c < sqCorners.length - 1; c++) {
+                            const from = sqCorners[c];
+                            const to = sqCorners[c + 1];
+                            const segPoints = Math.floor(numPoints / 4);
+                            for (let i = 0; i <= segPoints; i++) {
+                                const t = i / segPoints;
+                                shapePoints.push({
+                                    x: from.x + (to.x - from.x) * t,
+                                    y: from.y + (to.y - from.y) * t
+                                });
+                            }
+                        }
+                        startPoint = { x: centerX, y: centerY - sqHalf };
+                        break;
+                        
+                    case 'rectangle':
+                        const rectW = baseSize * 1.2;
+                        const rectH = baseSize * 0.65;
+                        const rectCorners = [
+                            { x: centerX, y: centerY - rectH },      // top center (start)
+                            { x: centerX + rectW, y: centerY - rectH }, // top right
+                            { x: centerX + rectW, y: centerY + rectH }, // bottom right
+                            { x: centerX - rectW, y: centerY + rectH }, // bottom left
+                            { x: centerX - rectW, y: centerY - rectH }, // top left
+                            { x: centerX, y: centerY - rectH }       // back to start
+                        ];
+                        for (let c = 0; c < rectCorners.length - 1; c++) {
+                            const from = rectCorners[c];
+                            const to = rectCorners[c + 1];
+                            const segPoints = Math.floor(numPoints / 4);
+                            for (let i = 0; i <= segPoints; i++) {
+                                const t = i / segPoints;
+                                shapePoints.push({
+                                    x: from.x + (to.x - from.x) * t,
+                                    y: from.y + (to.y - from.y) * t
+                                });
+                            }
+                        }
+                        startPoint = { x: centerX, y: centerY - rectH };
+                        break;
+                        
+                    case 'triangle':
+                        const triSize = baseSize * 1.1;
+                        const triHeight = triSize * Math.sqrt(3) / 2;
+                        const triCorners = [
+                            { x: centerX, y: centerY - triHeight * 0.6 },           // top (start)
+                            { x: centerX + triSize / 2, y: centerY + triHeight * 0.4 }, // bottom right
+                            { x: centerX - triSize / 2, y: centerY + triHeight * 0.4 }, // bottom left
+                            { x: centerX, y: centerY - triHeight * 0.6 }            // back to top
+                        ];
+                        for (let c = 0; c < triCorners.length - 1; c++) {
+                            const from = triCorners[c];
+                            const to = triCorners[c + 1];
+                            const segPoints = Math.floor(numPoints / 3);
+                            for (let i = 0; i <= segPoints; i++) {
+                                const t = i / segPoints;
+                                shapePoints.push({
+                                    x: from.x + (to.x - from.x) * t,
+                                    y: from.y + (to.y - from.y) * t
+                                });
+                            }
+                        }
+                        startPoint = { x: centerX, y: centerY - triHeight * 0.6 };
+                        break;
+                }
+            };
+            
+            generateShapePoints();
+
+            // Draw the guide shape
+            const drawGuideShape = (opacity = 1) => {
+                ctx.strokeStyle = `rgba(221, 221, 221, ${opacity})`;
+                ctx.lineWidth = 3;
+                ctx.setLineDash([10, 10]);
+                ctx.beginPath();
+                ctx.moveTo(shapePoints[0].x, shapePoints[0].y);
+                for (let i = 1; i < shapePoints.length; i++) {
+                    ctx.lineTo(shapePoints[i].x, shapePoints[i].y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+                
+                // Draw start point
+                ctx.fillStyle = `rgba(255, 140, 0, ${opacity})`;
+                ctx.beginPath();
+                ctx.arc(startPoint.x, startPoint.y, 12, 0, Math.PI * 2);
+                ctx.fill();
+            };
+
+            clearCanvas();
+            drawGuideShape(1);
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                if (e.touches) {
+                    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                }
+                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            };
+
+            const isNearStart = (pos) => {
+                const dx = pos.x - startPoint.x;
+                const dy = pos.y - startPoint.y;
+                return Math.sqrt(dx * dx + dy * dy) < 30;
+            };
+            
+            const getDistanceToShape = (point) => {
+                let minDist = Infinity;
+                for (const sp of shapePoints) {
+                    const dx = point.x - sp.x;
+                    const dy = point.y - sp.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < minDist) minDist = dist;
+                }
+                return minDist;
+            };
+
+            const startDraw = (e) => {
+                e.preventDefault();
+                const pos = getPos(e);
+                
+                if (!isNearStart(pos)) return;
+                
+                isDrawing = true;
+                drawPoints = [pos];
+                phase = 'drawing';
+                gameOverlay.classList.add('hidden');
+            };
+
+            const moveDraw = (e) => {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const pos = getPos(e);
+                drawPoints.push(pos);
+                
+                const progress = drawPoints.length;
+                
+                clearCanvas();
+                
+                // Fade guide after 5% progress
+                const guideOpacity = Math.max(0, 1 - progress / 30);
+                
+                if (guideOpacity > 0) {
+                    drawGuideShape(guideOpacity);
+                }
+                
+                // Draw user's line (also fades)
+                const lineOpacity = Math.max(0, 1 - progress / 30);
+                ctx.strokeStyle = `rgba(255, 140, 0, ${lineOpacity})`;
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(drawPoints[0].x, drawPoints[0].y);
+                for (let i = 1; i < drawPoints.length; i++) {
+                    ctx.lineTo(drawPoints[i].x, drawPoints[i].y);
+                }
+                ctx.stroke();
+            };
+
+            const endDraw = (e) => {
+                if (!isDrawing) return;
+                isDrawing = false;
+                
+                // Score based on how well they stayed on the track
+                let pointsOnTrack = 0;
+                let totalPoints = drawPoints.length;
+                
+                for (const point of drawPoints) {
+                    const distFromShape = getDistanceToShape(point);
+                    if (distFromShape <= trackWidth) {
+                        pointsOnTrack++;
+                    }
+                }
+                
+                // Check if they completed the shape (ended near start)
+                const endPoint = drawPoints[drawPoints.length - 1];
+                const endNearStart = isNearStart(endPoint);
+                
+                let score = (pointsOnTrack / totalPoints) * 100;
+                if (!endNearStart && drawPoints.length > 50) {
+                    score *= 0.7; // Penalty for not completing
+                }
+                
+                score = Math.max(0, Math.min(100, score));
+                state.scores[2] = score;
+                
+                canvas.removeEventListener('mousedown', startDraw);
+                canvas.removeEventListener('touchstart', startDraw);
+                canvas.removeEventListener('mousemove', moveDraw);
+                canvas.removeEventListener('touchmove', moveDraw);
+                canvas.removeEventListener('mouseup', endDraw);
+                canvas.removeEventListener('touchend', endDraw);
+                
+                // Show the actual shape vs their drawing
+                clearCanvas();
+                drawGuideShape(1);
+                
+                ctx.strokeStyle = '#ff8c00';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                ctx.moveTo(drawPoints[0].x, drawPoints[0].y);
+                for (let i = 1; i < drawPoints.length; i++) {
+                    ctx.lineTo(drawPoints[i].x, drawPoints[i].y);
+                }
+                ctx.stroke();
+                
+                gameSubtitle.textContent = `${selectedShape.charAt(0).toUpperCase() + selectedShape.slice(1)} accuracy: ${Math.round(score)}%`;
+                gameOverlay.classList.remove('hidden');
+                gameInstruction.textContent = '';
+                
+                showStageScore(score, () => runStage(3));
+            };
+
+            canvas.addEventListener('mousedown', startDraw);
+            canvas.addEventListener('touchstart', startDraw);
+            canvas.addEventListener('mousemove', moveDraw);
+            canvas.addEventListener('touchmove', moveDraw);
+            canvas.addEventListener('mouseup', endDraw);
+            canvas.addEventListener('touchend', endDraw);
+        }
+
+        // ==================== STAGE 4: RABBIT CHASE ====================
+        function runRabbitStage() {
+            stageIndicator.textContent = 'Stage 4 of 4: Invisible Rabbit';
+            
+            // Square track parameters
+            const padding = 60;
+            const trackSize = Math.min(canvas.width, canvas.height) - padding * 2;
+            const trackLeft = (canvas.width - trackSize) / 2;
+            const trackTop = (canvas.height - trackSize) / 2;
+            const trackWidth = 40;
+            
+            // Random consistent speed (2 to 4 pixels per frame)
+            const rabbitSpeed = 2 + Math.random() * 2;
+            
+            // Random starting corner and direction
+            const corners = [
+                { x: trackLeft, y: trackTop, dir: 'right' },                    // top-left, go right
+                { x: trackLeft + trackSize, y: trackTop, dir: 'down' },         // top-right, go down
+                { x: trackLeft + trackSize, y: trackTop + trackSize, dir: 'left' }, // bottom-right, go left
+                { x: trackLeft, y: trackTop + trackSize, dir: 'up' }            // bottom-left, go up
+            ];
+            const startCorner = corners[Math.floor(Math.random() * 4)];
+            
+            // Random offset along the starting edge (0 to trackSize)
+            const startOffset = Math.random() * trackSize;
+            
+            let rabbit = {
+                x: startCorner.x,
+                y: startCorner.y,
+                direction: startCorner.dir,
+                visible: true
+            };
+            
+            // Apply offset based on starting direction
+            switch (rabbit.direction) {
+                case 'right': rabbit.x += startOffset; break;
+                case 'down': rabbit.y += startOffset; break;
+                case 'left': rabbit.x -= startOffset; break;
+                case 'up': rabbit.y -= startOffset; break;
             }
             
-            // Remove from DOM
-            elemDiv.remove();
-        }
-    });
-}
+            let phase = 'watch'; // watch, countdown, play
+            let animationId = null;
+            let countdownValue = 3;
+            let canTouch = false;
+            let touchTimeout = null;
 
-function refreshCurrentStep() {
-    const s = STEPS.find(x => x.id === current);
-    if (!s) return;
-    fullDraw();
-}
+            gameInstruction.textContent = '🐰 Watch the rabbit\'s pattern';
+            gameSubtitle.textContent = 'It moves around the square at constant speed';
+            gameOverlay.classList.remove('hidden');
 
-function render() {
-    timers.forEach(t => clearTimeout(t));
-    timers = [];
-    timerCountdowns = {};
-    hiding = {};
-    rendered = {};
-    draggedElem = null;
-    
-    // Track step history (keep last 10 steps max)
-    if (stepHistory[stepHistory.length - 1] !== current) {
-        stepHistory.push(current);
-        if (stepHistory.length > 10) stepHistory.shift();
-    }
-    
-    // Clean up media from steps older than 2 steps back
-    cleanupOldMedia();
-    
-    const s = STEPS.find(x => x.id === current);
-    if (!s) return;
-    
-    if (s.password) {
-        const pwd = prompt("Password:");
-        if (pwd !== s.password) {
-            if (s.wrongPasswordStep) { current = s.wrongPasswordStep; render(); return; }
-            else { alert("Wrong!"); return; }
+            const drawTrack = () => {
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = trackWidth;
+                ctx.lineCap = 'square';
+                ctx.beginPath();
+                ctx.moveTo(trackLeft, trackTop);
+                ctx.lineTo(trackLeft + trackSize, trackTop);
+                ctx.lineTo(trackLeft + trackSize, trackTop + trackSize);
+                ctx.lineTo(trackLeft, trackTop + trackSize);
+                ctx.closePath();
+                ctx.stroke();
+            };
+
+            const moveRabbit = () => {
+                switch (rabbit.direction) {
+                    case 'up':
+                        rabbit.y -= rabbitSpeed;
+                        if (rabbit.y <= trackTop) {
+                            rabbit.y = trackTop;
+                            rabbit.direction = 'right';
+                        }
+                        break;
+                    case 'right':
+                        rabbit.x += rabbitSpeed;
+                        if (rabbit.x >= trackLeft + trackSize) {
+                            rabbit.x = trackLeft + trackSize;
+                            rabbit.direction = 'down';
+                        }
+                        break;
+                    case 'down':
+                        rabbit.y += rabbitSpeed;
+                        if (rabbit.y >= trackTop + trackSize) {
+                            rabbit.y = trackTop + trackSize;
+                            rabbit.direction = 'left';
+                        }
+                        break;
+                    case 'left':
+                        rabbit.x -= rabbitSpeed;
+                        if (rabbit.x <= trackLeft) {
+                            rabbit.x = trackLeft;
+                            rabbit.direction = 'up';
+                        }
+                        break;
+                }
+            };
+
+            const drawRabbit = (opacity = 1) => {
+                if (opacity > 0) {
+                    ctx.font = '40px Arial';
+                    ctx.globalAlpha = opacity;
+                    ctx.fillText('🐰', rabbit.x - 20, rabbit.y + 15);
+                    ctx.globalAlpha = 1;
+                }
+            };
+
+            let watchCycles = 0;
+            let fadeStartTime = null;
+            const watchDuration = 6000; // 6 seconds of watching
+            const fadeDuration = 2000; // 2 seconds to fade
+
+            const animate = () => {
+                clearCanvas();
+                drawTrack();
+                moveRabbit();
+                
+                if (phase === 'watch') {
+                    drawRabbit(1);
+                    
+                    if (!fadeStartTime && Date.now() - animStartTime > watchDuration) {
+                        fadeStartTime = Date.now();
+                        gameInstruction.textContent = 'Rabbit fading...';
+                    }
+                    
+                    if (fadeStartTime) {
+                        const fadeProgress = (Date.now() - fadeStartTime) / fadeDuration;
+                        if (fadeProgress >= 1) {
+                            phase = 'countdown';
+                            startCountdown();
+                        } else {
+                            drawRabbit(1 - fadeProgress);
+                        }
+                    }
+                } else if (phase === 'play') {
+                    // Rabbit is invisible but still moving
+                }
+                
+                if (phase !== 'ended') {
+                    animationId = requestAnimationFrame(animate);
+                }
+            };
+
+            let animStartTime = Date.now();
+            animationId = requestAnimationFrame(animate);
+
+            const startCountdown = () => {
+                gameOverlay.classList.add('hidden');
+                countdown.classList.remove('hidden');
+                countdownValue = 3;
+                
+                const countInterval = setInterval(() => {
+                    countdown.textContent = countdownValue;
+                    countdownValue--;
+                    
+                    if (countdownValue < 0) {
+                        clearInterval(countInterval);
+                        countdown.textContent = 'Touch!';
+                        setTimeout(() => {
+                            countdown.classList.add('hidden');
+                            phase = 'play';
+                            canTouch = true;
+                            
+                            // 10 second timeout
+                            touchTimeout = setTimeout(() => {
+                                if (canTouch) {
+                                    endGame(null);
+                                }
+                            }, 10000);
+                        }, 500);
+                    }
+                }, 1000);
+            };
+
+            const getPos = (e) => {
+                const rect = canvas.getBoundingClientRect();
+                if (e.touches) {
+                    return { x: e.touches[0].clientX - rect.left, y: e.touches[0].clientY - rect.top };
+                }
+                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+            };
+
+            const getTrackPosition = (x, y) => {
+                // Find closest point on track
+                const points = [
+                    { x: trackLeft, y: trackTop }, // top-left
+                    { x: trackLeft + trackSize, y: trackTop }, // top-right
+                    { x: trackLeft + trackSize, y: trackTop + trackSize }, // bottom-right
+                    { x: trackLeft, y: trackTop + trackSize } // bottom-left
+                ];
+                
+                // Check each edge
+                let minDist = Infinity;
+                let closestPoint = null;
+                
+                for (let i = 0; i < 4; i++) {
+                    const p1 = points[i];
+                    const p2 = points[(i + 1) % 4];
+                    
+                    // Project point onto line segment
+                    const dx = p2.x - p1.x;
+                    const dy = p2.y - p1.y;
+                    const len = Math.sqrt(dx * dx + dy * dy);
+                    const t = Math.max(0, Math.min(1, ((x - p1.x) * dx + (y - p1.y) * dy) / (len * len)));
+                    
+                    const closest = {
+                        x: p1.x + t * dx,
+                        y: p1.y + t * dy
+                    };
+                    
+                    const dist = Math.sqrt((x - closest.x) ** 2 + (y - closest.y) ** 2);
+                    if (dist < minDist) {
+                        minDist = dist;
+                        closestPoint = closest;
+                    }
+                }
+                
+                return closestPoint;
+            };
+
+            const getTrackDistance = (p1, p2) => {
+                // Calculate distance along the track (perimeter)
+                const perimeter = trackSize * 4;
+                
+                const getTrackPos = (p) => {
+                    // Convert x,y to position along track (0 to perimeter)
+                    if (Math.abs(p.y - trackTop) < 5) {
+                        // Top edge
+                        return p.x - trackLeft;
+                    } else if (Math.abs(p.x - (trackLeft + trackSize)) < 5) {
+                        // Right edge
+                        return trackSize + (p.y - trackTop);
+                    } else if (Math.abs(p.y - (trackTop + trackSize)) < 5) {
+                        // Bottom edge
+                        return trackSize * 2 + (trackLeft + trackSize - p.x);
+                    } else {
+                        // Left edge
+                        return trackSize * 3 + (trackTop + trackSize - p.y);
+                    }
+                };
+                
+                const pos1 = getTrackPos(p1);
+                const pos2 = getTrackPos(p2);
+                
+                let dist = Math.abs(pos1 - pos2);
+                // Use shorter distance (could go either way around)
+                if (dist > perimeter / 2) {
+                    dist = perimeter - dist;
+                }
+                
+                return dist;
+            };
+
+            const handleTouch = (e) => {
+                if (!canTouch || phase !== 'play') return;
+                e.preventDefault();
+                canTouch = false;
+                clearTimeout(touchTimeout);
+                
+                const pos = getPos(e);
+                endGame(pos);
+            };
+
+            const endGame = (touchPos) => {
+                phase = 'ended';
+                cancelAnimationFrame(animationId);
+                
+                let score = 0;
+                
+                if (touchPos) {
+                    const closestTrackPoint = getTrackPosition(touchPos.x, touchPos.y);
+                    const rabbitPos = { x: rabbit.x, y: rabbit.y };
+                    const distance = getTrackDistance(closestTrackPoint, rabbitPos);
+                    const perimeter = trackSize * 4;
+                    const maxDist = perimeter / 2; // Opposite side = 0 points
+                    
+                    score = Math.max(0, 100 - (distance / maxDist) * 100);
+                }
+                
+                state.scores[3] = score;
+                
+                // Show result
+                clearCanvas();
+                drawTrack();
+                
+                // Show rabbit position
+                ctx.font = '40px Arial';
+                ctx.fillText('🐰', rabbit.x - 20, rabbit.y + 15);
+                
+                // Show touch position if any
+                if (touchPos) {
+                    ctx.fillStyle = '#ff8c00';
+                    ctx.beginPath();
+                    ctx.arc(touchPos.x, touchPos.y, 15, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                
+                canvas.removeEventListener('mousedown', handleTouch);
+                canvas.removeEventListener('touchstart', handleTouch);
+                
+                gameSubtitle.textContent = touchPos ? 'Orange = your touch, 🐰 = actual position' : 'Time ran out!';
+                gameOverlay.classList.remove('hidden');
+                gameInstruction.textContent = '';
+                
+                showStageScore(score, () => showResults());
+            };
+
+            canvas.addEventListener('mousedown', handleTouch);
+            canvas.addEventListener('touchstart', handleTouch);
         }
-    }
-    
-    visible = {};
-    s.elements.forEach(e => {
-        visible[e.id] = e.visible;
-        if (e.visible && e.duration && e.duration > 0) {
-            const t = setTimeout(() => hideElem(e.id), e.duration * 1000);
-            timers.push(t);
-        }
-        if (e.type === "timer" && e.visible) startTimer(e.id, e.countdown);
-    });
-    
-    s.events.forEach(ev => {
-        if (checkCond(ev.condition)) {
-            if (ev.trigger.type === "onLoad") exec(ev.actions);
-            else if (ev.trigger.type === "afterDelay") {
-                const t = setTimeout(() => exec(ev.actions), (ev.trigger.delay || 0) * 1000);
-                timers.push(t);
+
+        // ==================== RESULTS ====================
+        function showResults() {
+            hideAllScreens();
+            
+            const total = state.scores.reduce((a, b) => a + b, 0);
+            const average = total / 4;
+            const percentage = Math.round(average);
+            
+            finalScore.textContent = percentage + '%';
+            
+            const stageNames = ['Time Sense', 'Length Sense', 'Shape Sense', 'Rabbit Chase'];
+            scoreBreakdown.innerHTML = state.scores.map((score, i) => 
+                `<div class="score-item">${stageNames[i]}: ${Math.round(score)} pts</div>`
+            ).join('');
+            
+            // Check for new record
+            if (state.bestScore === null || percentage > state.bestScore) {
+                state.bestScore = percentage;
+                saveData();
+                newRecord.classList.remove('hidden');
+            } else {
+                newRecord.classList.add('hidden');
             }
+            
+            resultsScreen.style.display = 'flex';
         }
-    });
-    
-    fullDraw();
-}
 
-function startTimer(id, countdown) {
-    let rem = countdown;
-    timerCountdowns[id] = rem;
-    const int = setInterval(() => {
-        rem--;
-        timerCountdowns[id] = rem;
-        const timerDiv = document.querySelector('[data-elem-id="' + id + '"] .elem-timer');
-        if (timerDiv) timerDiv.textContent = rem;
-        if (rem <= 0) {
-            clearInterval(int);
-            const s = STEPS.find(x => x.id === current);
-            s.events.forEach(ev => {
-                if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === id && checkCond(ev.condition)) exec(ev.actions);
-            });
-        }
-    }, 1000);
-    timers.push(int);
-}
-
-function hideElem(id) {
-    const s = STEPS.find(x => x.id === current);
-    const elem = s.elements.find(e => e.id === id);
-    const elemDiv = document.querySelector('[data-elem-id="' + id + '"]');
-    
-    if (!elemDiv) {
-        visible[id] = false;
-        delete rendered[id];
-        return;
-    }
-    
-    const audio = elemDiv.querySelector('audio');
-    const video = elemDiv.querySelector('video');
-    if (audio) { audio.pause(); audio.currentTime = 0; }
-    if (video) { video.pause(); video.currentTime = 0; }
-    
-    const outTrans = elem && elem.transitionOut && elem.transitionOut !== "none" ? elem.transitionOut : (elem ? elem.transition : "none");
-    const outDur = elem && elem.transitionOut && elem.transitionOut !== "none" ? (elem.transitionOutDuration || 0.5) : (elem ? (elem.transitionDuration || 0.5) : 0.5);
-    
-    if (outTrans && outTrans !== "none") {
-        hiding[id] = true;
-        elemDiv.className = elemDiv.className.replace(/\btrans-[\w-]+\b/g, '').replace(/\banim-[\w-]+\b/g, '').trim() + ' trans-' + outTrans + '-out';
-        elemDiv.style.animationDuration = outDur + 's';
-        setTimeout(() => {
-            visible[id] = false;
-            hiding[id] = false;
-            delete rendered[id];
-            if (elemDiv.parentNode) elemDiv.remove();
-        }, outDur * 1000);
-    } else {
-        visible[id] = false;
-        delete rendered[id];
-        elemDiv.remove();
-    }
-}
-
-function showElem(id) {
-    if (visible[id] && rendered[id]) return;
-    visible[id] = true;
-    const s = STEPS.find(x => x.id === current);
-    const elem = s.elements.find(e => e.id === id);
-    if (elem) {
-        if (elem.type === "timer") startTimer(id, elem.countdown);
-        if (elem.duration && elem.duration > 0) {
-            const t = setTimeout(() => hideElem(id), elem.duration * 1000);
-            timers.push(t);
-        }
-        addElement(elem, true);
-    }
-}
-
-function checkCond(c) {
-    if (!c) return true;
-    if (c.type === "hasItem") {
-        const items = c.items || (c.item ? [c.item] : []);
-        if (items.length === 0) return true;
-        const logic = c.logic || 'any';
-        if (logic === 'all') return items.every(i => inventory.includes(i));
-        return items.some(i => inventory.includes(i));
-    }
-    if (c.type === "notHasItem") {
-        const items = c.items || (c.item ? [c.item] : []);
-        if (items.length === 0) return true;
-        const logic = c.logic || 'any';
-        if (logic === 'all') return !items.every(i => inventory.includes(i));
-        return items.every(i => !inventory.includes(i));
-    }
-    if (c.type === "varyingAtLeast") return (varyingValues[c.item] || 0) >= (c.amount || 0);
-    if (c.type === "varyingAtMost") return (varyingValues[c.item] || 0) <= (c.amount || 0);
-    if (c.type === "varyingBetween") return (varyingValues[c.item] || 0) >= (c.min || 0) && (varyingValues[c.item] || 0) <= (c.max || 0);
-    return true;
-}
-
-function exec(acts) {
-    acts.forEach(a => {
-        if (a.type === "show" || a.type === "showDelay") {
-            const delay = (a.type === "showDelay" && a.delay) ? a.delay * 1000 : 0;
-            const targets = a.targets && a.targets.length > 0 ? a.targets : [a.target];
-            targets.forEach(t => { if (t) setTimeout(() => showElem(t), delay); });
-        } else if (a.type === "hide" || a.type === "hideDelay") {
-            const delay = (a.type === "hideDelay" && a.delay) ? a.delay * 1000 : 0;
-            const targets = a.targets && a.targets.length > 0 ? a.targets : [a.target];
-            targets.forEach(t => { if (t) setTimeout(() => hideElem(t), delay); });
-        } else if (a.type === "goto") {
-            if (a.targets && a.targets.length > 0) current = a.targets[Math.floor(Math.random() * a.targets.length)];
-            else if (a.target) current = a.target;
-            render();
-            return;
-        } else if (a.type === "addItem" && !inventory.includes(a.target)) inventory.push(a.target);
-        else if (a.type === "removeItem") inventory = inventory.filter(x => x !== a.target);
-        else if (a.type === "addVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) + (a.amount || 0);
-        else if (a.type === "subtractVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) - (a.amount || 0);
-        else if (a.type === "setVarying") varyingValues[a.target] = a.amount || 0;
-        else if (a.type === "bgmPlay") playBGM();
-        else if (a.type === "bgmStop") stopBGM();
-        else if (a.type === "showInventory") { showInvDisplay = true; }
-        else if (a.type === "hideInventory") { showInvDisplay = false; }
-        else if (a.type === "showVarying") { showVaryDisplay = true; }
-        else if (a.type === "hideVarying") { showVaryDisplay = false; }
-        else if (a.type === "saveState") {
-            const saveData = { stepId: current, inventory: inventory, varying: varyingValues };
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
-        }
-        else if (a.type === "loadState") {
-            const saveData = localStorage.getItem(STORAGE_KEY);
-            if (saveData) {
-                const parsed = JSON.parse(saveData);
-                inventory = parsed.inventory || [];
-                varyingValues = parsed.varying || {};
-                if (parsed.stepId) { current = parsed.stepId; render(); return; }
-            }
-        }
-        else if (a.type === "clearState") {
-            localStorage.removeItem(STORAGE_KEY);
-        }
-    });
-    updateInventory();
-}
-
-function hexToRgba(hex, opacity) {
-    if (!hex || hex.startsWith('rgba')) return hex || 'rgba(0,0,0,' + opacity + ')';
-    hex = hex.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    return 'rgba(' + r + ',' + g + ',' + b + ',' + opacity + ')';
-}
-
-function createElemHTML(e, withTransition) {
-    const isHiding = hiding[e.id];
-    const outTrans = e.transitionOut && e.transitionOut !== "none" ? e.transitionOut : e.transition;
-    const transClass = withTransition && e.transition && e.transition !== "none" && !isHiding ? " trans-" + e.transition : (isHiding && outTrans && outTrans !== "none" ? " trans-" + outTrans + "-out" : "");
-    const duringClass = e.animationDuring && e.animationDuring !== "none" && !isHiding ? " anim-" + e.animationDuring : "";
-    const transDur = isHiding ? (e.transitionOutDuration || e.transitionDuration || 0.5) : (e.transitionDuration || 0.5);
-    const flipScaleX = e.flipH ? -1 : 1;
-    const flipScaleY = e.flipV ? -1 : 1;
-    const rotation = e.rotation || 0;
-    const objectOpacity = (e.opacity !== undefined ? e.opacity : 100) / 100;
-    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg);opacity:" + objectOpacity : "";
-    const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s" + objectStyle;
-    const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \'' + e.id + '\')" ontouchstart="handleDragStart(event, \'' + e.id + '\')"' : "";
-    const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\'' + e.id + '\')"' : "";
-    const hotspotClass = (e.type === "hotspot" && e.showInGame) ? " elem-hotspot-visible" : "";
-    const objectClass = e.type === "object" ? " elem-object" : "";
-    const imgTransform = (e.flipH || e.flipV || rotation) ? "transform:scale(" + flipScaleX + "," + flipScaleY + ") rotate(" + rotation + "deg);" : "";
-    
-    let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + objectClass + transClass + duringClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
-    if (e.type === "image" && e.content) h += '<img src="' + e.content + '" style="' + imgTransform + 'opacity:' + ((e.opacity !== undefined ? e.opacity : 100) / 100) + ';">';
-    if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (OPTIMIZE_VIDEO ? 'preload="metadata" ' : '') + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\'' + e.id + '\')" data-video-id="' + e.id + '"><source src="' + e.content + '"></video>';
-    if (e.type === "text") {
-        const bgOpacity = e.textBgOpacity !== undefined ? e.textBgOpacity : 0.8;
-        const bgColor = hexToRgba(e.textBgColor || '#000000', bgOpacity);
-        const textStyle = 'font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + bgColor + 
-            (e.textBold ? ';font-weight:bold' : '') + 
-            (e.textItalic ? ';font-style:italic' : '') + 
-            (e.textUnderline ? ';text-decoration:underline' : '') +
-            (e.textBorder ? ';border:' + (e.textBorderWidth || 2) + 'px solid ' + (e.textBorderColor || '#ffffff') : '');
-        h += '<div class="elem-text" style="' + textStyle + '">' + e.content + '</div>';
-    }
-    if (e.type === "button") {
-        const shadowStyle = e.buttonShadow ? 'box-shadow:0 4px 15px rgba(0,0,0,0.4);' : '';
-        const pulseClass = e.buttonPulse ? ' anim-buttonPulse' : '';
-        h += '<div class="elem-button' + pulseClass + '" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px;' + shadowStyle + '">' + (e.content || "Button") + '</div>';
-    }
-    if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\'' + e.id + '\')"><source src="' + e.content + '"></audio>';
-    if (e.type === "timer") h += '<div class="elem-timer">' + (timerCountdowns[e.id] !== undefined ? timerCountdowns[e.id] : e.countdown) + '</div>';
-    if (e.type === "draggable") {
-        if (e.contentType === "image" && e.content) h += '<img src="' + e.content + '">';
-        else h += '<div style="font-size:' + e.fontSize + 'px;color:#fff;pointer-events:none">' + (e.content || "📦") + '</div>';
-    }
-    if (e.type === "object") h += '';
-    if (e.type === "embed" && e.embedUrl) {
-        if (e.embedThumbnail) {
-            h += '<img src="' + e.embedThumbnail + '" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="showEmbed(\'' + e.id + '\')">';
-        } else {
-            h += '<div style="width:100%;height:100%;background:rgba(128,0,255,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;cursor:pointer" onclick="showEmbed(\'' + e.id + '\')">▶ Click to Open</div>';
-        }
-    }
-    h += '</div>';
-    return h;
-}
-
-function addElement(e, withTransition) {
-    if (!e || rendered[e.id]) return;
-    const game = document.getElementById("game");
-    const s = STEPS.find(x => x.id === current);
-    const temp = document.createElement('div');
-    temp.innerHTML = createElemHTML(e, withTransition);
-    const newElem = temp.firstChild;
-    
-    const existingElems = Array.from(game.querySelectorAll('[data-elem-id]'));
-    let inserted = false;
-    for (const existing of existingElems) {
-        const existingE = s.elements.find(el => el.id === existing.getAttribute('data-elem-id'));
-        if (existingE && existingE.layer > e.layer) {
-            game.insertBefore(newElem, existing);
-            inserted = true;
-            break;
-        }
-    }
-    if (!inserted) game.appendChild(newElem);
-    rendered[e.id] = true;
-}
-
-function fullDraw() {
-    const s = STEPS.find(x => x.id === current);
-    const game = document.getElementById("game");
-    game.style.background = s.bgColor || "#000";
-    let h = "";
-    
-    if (s.bgShapes) {
-        s.bgShapes.forEach(sh => {
-            h += '<div style="position:absolute;left:' + sh.x + 'px;top:' + sh.y + 'px;width:' + sh.width + 'px;height:' + sh.height + 'px;background:' + sh.color + ';border-radius:' + (sh.type === "circle" ? "50%" : "0") + ';z-index:0"></div>';
-        });
-    }
-    
-    s.elements.filter(e => visible[e.id] || hiding[e.id]).sort((a, b) => a.layer - b.layer).forEach(e => {
-        h += createElemHTML(e, true);
-        rendered[e.id] = true;
-    });
-    
-    game.innerHTML = h;
-    updateInventory();
-}
-
-function updateInventory() {
-    const inv = document.getElementById("inventory");
-    const visInv = showInvDisplay ? inventory.filter(item => {
-        const invItem = INVENTORY_ITEMS.find(i => (i.name || i) === item);
-        if (!invItem) return false;
-        if (typeof invItem === "string") return true;
-        return invItem.visible !== false;
-    }) : [];
-    const visVarying = showVaryDisplay ? VARYING_ITEMS.filter(vi => vi.visible !== false) : [];
-    
-    if (visInv.length > 0 || visVarying.length > 0) {
-        inv.style.display = "flex";
-        let html = "";
-        // Inventory items as text
-        visInv.forEach(itemName => {
-            const invItem = INVENTORY_ITEMS.find(i => (i.name || i) === itemName);
-            const displayName = invItem && invItem.displayName ? invItem.displayName : itemName;
-            html += '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold"><span style="color:#fff">• ' + displayName + '</span></div>';
-        });
-        // Varying items
-        visVarying.forEach(vi => {
-            const displayName = vi.displayName || vi.name;
-            html += '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold"><span style="color:#fff">' + displayName + ':</span><span>' + (varyingValues[vi.name] || 0) + '</span></div>';
-        });
-        inv.innerHTML = html;
-    } else {
-        inv.style.display = "none";
-    }
-}
-
-function getEventPos(ev) {
-    if (ev.touches && ev.touches.length > 0) {
-        return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
-    }
-    if (ev.changedTouches && ev.changedTouches.length > 0) {
-        return { x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY };
-    }
-    return { x: ev.clientX, y: ev.clientY };
-}
-
-function handleDragStart(ev, elemId) {
-    ev.preventDefault();
-    const s = STEPS.find(x => x.id === current);
-    const elem = s.elements.find(e => e.id === elemId);
-    if (!elem) return;
-    draggedElem = elem;
-    const rect = ev.target.getBoundingClientRect();
-    const canvas = document.getElementById("game");
-    const canvasRect = canvas.getBoundingClientRect();
-    const pos = getEventPos(ev);
-    dragOffset.x = pos.x - rect.left;
-    dragOffset.y = pos.y - rect.top;
-    dragPos.x = pos.x - canvasRect.left;
-    dragPos.y = pos.y - canvasRect.top;
-    document.addEventListener('mousemove', handleDragMove);
-    document.addEventListener('mouseup', handleDragEnd);
-    document.addEventListener('touchmove', handleDragMove, { passive: false });
-    document.addEventListener('touchend', handleDragEnd);
-}
-
-function handleDragMove(ev) {
-    if (!draggedElem) return;
-    ev.preventDefault();
-    const canvas = document.getElementById("game");
-    const rect = canvas.getBoundingClientRect();
-    const pos = getEventPos(ev);
-    dragPos.x = pos.x - rect.left;
-    dragPos.y = pos.y - rect.top;
-    const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
-    if (draggedDiv) {
-        draggedDiv.style.left = (dragPos.x - dragOffset.x) + 'px';
-        draggedDiv.style.top = (dragPos.y - dragOffset.y) + 'px';
-    }
-}
-
-function handleDragEnd(ev) {
-    if (!draggedElem) return;
-    const s = STEPS.find(x => x.id === current);
-    const canvas = document.getElementById("game");
-    const rect = canvas.getBoundingClientRect();
-    const pos = getEventPos(ev);
-    const dropX = pos.x - rect.left;
-    const dropY = pos.y - rect.top;
-    s.elements.filter(e => e.type === "hotspot" && visible[e.id] && e.hotspotMode !== "click").forEach(h => {
-        if (dropX >= h.x && dropX <= h.x + h.width && dropY >= h.y && dropY <= h.y + h.height) {
-            s.events.forEach(ev => {
-                if (ev.trigger.type === "onDrop" && ev.trigger.sourceElement === h.id && checkCond(ev.condition)) exec(ev.actions);
-            });
-        }
-    });
-    document.removeEventListener('mousemove', handleDragMove);
-    document.removeEventListener('mouseup', handleDragEnd);
-    document.removeEventListener('touchmove', handleDragMove);
-    document.removeEventListener('touchend', handleDragEnd);
-    const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
-    if (draggedDiv) {
-        draggedDiv.style.left = draggedElem.x + 'px';
-        draggedDiv.style.top = draggedElem.y + 'px';
-    }
-    draggedElem = null;
-}
-
-function handleVideoEnd(id) {
-    const s = STEPS.find(x => x.id === current);
-    s.events.forEach(ev => {
-        if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === id && checkCond(ev.condition)) exec(ev.actions);
-    });
-}
-
-let lastClickTime = 0;
-const CLICK_DEBOUNCE_MS = 300;
-
-function handleClick(id) {
-    const now = Date.now();
-    if (now - lastClickTime < CLICK_DEBOUNCE_MS) return;
-    lastClickTime = now;
-    
-    const s = STEPS.find(x => x.id === current);
-    s.events.forEach(ev => {
-        if (ev.trigger.type === "onClick") {
-            const sources = ev.trigger.sourceElements || (ev.trigger.sourceElement ? [ev.trigger.sourceElement] : []);
-            if (sources.includes(id) && checkCond(ev.condition)) exec(ev.actions);
-        }
-    });
-}
-
-render();
+        // Initialize the game
+        init();
     </script>
 </body>
 </html>
