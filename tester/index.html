@@ -1,0 +1,1411 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Story</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { background: #000; overflow: hidden; }
+        .canvas { width: 1024px; height: 576px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+        
+        .elem { position: absolute; }
+        .elem img, .elem video { width: 100%; height: 100%; object-fit: cover; }
+        .elem video { pointer-events: none; }
+        .elem video::-webkit-media-controls { display: none !important; }
+        .elem video::-webkit-media-controls-enclosure { display: none !important; }
+        .elem-text { padding: 15px; border-radius: 6px; text-align: center; white-space: pre-wrap; }
+        .elem-button { padding: 15px 30px; border-radius: 6px; font-weight: 700; font-size: 1.2rem; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .elem-timer { background: rgba(247,147,26,0.8); color: #fff; font-size: 3rem; font-weight: 900; display: flex; align-items: center; justify-content: center; border-radius: 8px; font-family: monospace; }
+        .elem-draggable { cursor: grab; display: flex; align-items: center; justify-content: center; user-select: none; touch-action: none; }
+        .elem-draggable:active { cursor: grabbing; }
+        .elem-draggable img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+        .elem-hotspot-visible { border: 3px dashed rgba(255,0,0,0.5); background: rgba(255,0,0,0.05); }
+        .inventory-display { position: fixed; bottom:20px;left:20px; background: rgba(0,0,0,0.8); padding: 10px 15px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; z-index: 100; min-width: 120px; }
+        .inventory-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .inventory-item-icon { width: 40px; height: 40px; background: #f7931a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 20px; }
+        .inventory-item-name { font-size: 10px; color: #fff; text-align: center; max-width: 50px; overflow: hidden; text-overflow: ellipsis; }
+        .embed-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; background: #000; }
+        .embed-container iframe { width: 100%; height: 100%; border: none; }
+        .embed-close { position: absolute; bottom: 10px; right: 10px; width: 36px; height: 36px; background: #ef4444; border: none; border-radius: 50%; color: white; font-size: 20px; cursor: pointer; z-index: 10000; display: flex; align-items: center; justify-content: center; }
+        @keyframes buttonPulse { 0%, 100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(247,147,26,0.4); } 50% { transform: scale(1.02); box-shadow: 0 0 10px 3px rgba(247,147,26,0.3); } }
+        .anim-buttonPulse { animation: buttonPulse 1.5s ease-in-out infinite; }
+        
+        .trans-fade { animation: fadeIn 0.5s ease-in forwards; }
+        .trans-fade-out { animation: fadeOut 0.5s ease-out forwards; }
+        .trans-slideLeft { animation: slideLeft 0.5s ease-out forwards; }
+        .trans-slideLeft-out { animation: slideLeftOut 0.5s ease-in forwards; }
+        .trans-slideRight { animation: slideRight 0.5s ease-out forwards; }
+        .trans-slideRight-out { animation: slideRightOut 0.5s ease-in forwards; }
+        .trans-slideUp { animation: slideUp 0.5s ease-out forwards; }
+        .trans-slideUp-out { animation: slideUpOut 0.5s ease-in forwards; }
+        .trans-slideDown { animation: slideDown 0.5s ease-out forwards; }
+        .trans-slideDown-out { animation: slideDownOut 0.5s ease-in forwards; }
+        .trans-zoom { animation: zoomIn 0.5s ease-out forwards; }
+        .trans-zoom-out { animation: zoomOut 0.5s ease-in forwards; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+        @keyframes slideLeft { from { transform: translateX(-100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideLeftOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(-100%); opacity: 0; } }
+        @keyframes slideRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideRightOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+        @keyframes slideUp { from { transform: translateY(-100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideUpOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-100%); opacity: 0; } }
+        @keyframes slideDown { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes slideDownOut { from { transform: translateY(0); opacity: 1; } to { transform: translateY(100%); opacity: 0; } }
+        @keyframes zoomIn { from { transform: scale(0); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes zoomOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0); opacity: 0; } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes wobble { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); } 20%, 40%, 60%, 80% { transform: translateX(2px); } }
+        @keyframes glow { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.3); } }
+        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+        .anim-pulse { animation: pulse 1s ease-in-out infinite; }
+        .anim-spin { animation: spin 2s linear infinite; }
+        .anim-bounce { animation: bounce 0.5s ease-in-out infinite; }
+        .anim-wobble { animation: wobble 0.5s ease-in-out infinite; }
+        .anim-shake { animation: shake 0.5s ease-in-out infinite; }
+        .anim-glow { animation: glow 1.5s ease-in-out infinite; }
+        .anim-float { animation: float 2s ease-in-out infinite; }
+        .elem-object { display: flex; align-items: center; justify-content: center; }
+    </style>
+</head>
+<body>
+    <div id="game" class="canvas"></div>
+    <div id="inventory" class="inventory-display" style="display:none"></div>
+    <audio id="bgm" loop preload="auto"><source src="https://music.hirakatajin.com/Magical%20pond.m4a"></audio>
+    
+    <script>
+// Story data - properly formatted with indentation for readability
+const STORY_DATA = {
+  "steps": [
+    {
+      "id": "step_1769010749227_g1f39ptb8",
+      "title": "Step 1",
+      "elements": [
+        {
+          "id": "image_2",
+          "type": "image",
+          "label": "color",
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 576,
+          "content": "http://satmis.hirakatajin.com/orange.png",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "image_1",
+          "type": "image",
+          "label": "frame",
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 576,
+          "content": "http://satmis.hirakatajin.com/frame.png",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "text_1",
+          "type": "text",
+          "label": "text1",
+          "x": 153.60000000000002,
+          "y": 51.2,
+          "width": 300,
+          "height": 100,
+          "content": "Potato",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "slideUp",
+          "transitionDuration": 1,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "#ffffff",
+          "textSize": 55,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 0.01,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "text_2",
+          "type": "text",
+          "label": "text1_copy",
+          "x": 307.20000000000005,
+          "y": 51.2,
+          "width": 300,
+          "height": 100,
+          "content": "Guy",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "slideUp",
+          "transitionDuration": 2,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "#ffffff",
+          "textSize": 55,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 0.01,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "text_3",
+          "type": "text",
+          "label": "text1_copy_copy",
+          "x": 512,
+          "y": 51.2,
+          "width": 300,
+          "height": 100,
+          "content": "Adventure",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "slideUp",
+          "transitionDuration": 3,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "#ffffff",
+          "textSize": 55,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 0.01,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "audio_1",
+          "type": "audio",
+          "label": "audio1",
+          "x": 307.20000000000005,
+          "y": 256,
+          "width": 200,
+          "height": 60,
+          "content": "https://github.com/TheDepression/Sounds/raw/refs/heads/main/Convo/Blk1.m4a",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": true,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "button_1",
+          "type": "button",
+          "label": "step2 btn",
+          "x": 563.2,
+          "y": 204.8,
+          "width": 300,
+          "height": 60,
+          "content": "Go to step 2",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "button_2",
+          "type": "button",
+          "label": "Start audio btn",
+          "x": 563.2,
+          "y": 307.20000000000005,
+          "width": 300,
+          "height": 60,
+          "content": "Play audio",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "button_3",
+          "type": "button",
+          "label": "stop audio btn",
+          "x": 563.2,
+          "y": 409.6,
+          "width": 300,
+          "height": 60,
+          "content": "Stop audio",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        }
+      ],
+      "events": [
+        {
+          "id": "event_1769011443098",
+          "trigger": {
+            "type": "onLoad",
+            "delay": 0,
+            "sourceElement": ""
+          },
+          "condition": null,
+          "actions": [
+            {
+              "id": "action_1769011445749",
+              "type": "bgmPlay",
+              "target": "",
+              "value": ""
+            },
+            {
+              "id": "action_1769012763562",
+              "type": "hide",
+              "target": "",
+              "value": "",
+              "targets": [
+                "audio_1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "event_1769012793660",
+          "trigger": {
+            "type": "onClick",
+            "delay": 0,
+            "sourceElement": "",
+            "sourceElements": [
+              "button_1"
+            ]
+          },
+          "condition": null,
+          "actions": [
+            {
+              "id": "action_1769012874229",
+              "type": "goto",
+              "target": "",
+              "value": "",
+              "targets": [
+                "step_1769011247417_a2w6qwp0q"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "event_1769012881644",
+          "trigger": {
+            "type": "onClick",
+            "delay": 0,
+            "sourceElement": "",
+            "sourceElements": [
+              "button_2"
+            ]
+          },
+          "condition": null,
+          "actions": [
+            {
+              "id": "action_1769012886176",
+              "type": "show",
+              "target": "",
+              "value": "",
+              "targets": [
+                "audio_1"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "event_1769012896492",
+          "trigger": {
+            "type": "onClick",
+            "delay": 0,
+            "sourceElement": "",
+            "sourceElements": [
+              "button_3"
+            ]
+          },
+          "condition": null,
+          "actions": [
+            {
+              "id": "action_1769012904178",
+              "type": "hide",
+              "target": "",
+              "value": "",
+              "targets": [
+                "audio_1"
+              ]
+            }
+          ]
+        }
+      ],
+      "password": "",
+      "wrongPasswordStep": "",
+      "bgColor": "#000000",
+      "bgShapes": [],
+      "folderId": null
+    },
+    {
+      "id": "step_1769011247417_a2w6qwp0q",
+      "title": "Step 1 2",
+      "elements": [
+        {
+          "id": "image_2",
+          "type": "image",
+          "label": "image2",
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 576,
+          "content": "http://satmis.hirakatajin.com/lightblueblue.png",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "image_1",
+          "type": "image",
+          "label": "image1",
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 576,
+          "content": "http://satmis.hirakatajin.com/frame.png",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "button_1",
+          "type": "button",
+          "label": "stp1 btn",
+          "x": 100,
+          "y": 100,
+          "width": 300,
+          "height": 60,
+          "content": "Go back",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": true,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        },
+        {
+          "id": "button_2",
+          "type": "button",
+          "label": "stop bgm btn",
+          "x": 512,
+          "y": 102.4,
+          "width": 300,
+          "height": 60,
+          "content": "stop bgm",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": true,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
+        }
+      ],
+      "events": [
+        {
+          "id": "event_1769013033060",
+          "trigger": {
+            "type": "onClick",
+            "delay": 0,
+            "sourceElement": "",
+            "sourceElements": [
+              "button_1"
+            ]
+          },
+          "condition": null,
+          "actions": [
+            {
+              "id": "action_1769013044311",
+              "type": "goto",
+              "target": "",
+              "value": "",
+              "targets": [
+                "step_1769010749227_g1f39ptb8"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "event_1769013051360",
+          "trigger": {
+            "type": "onClick",
+            "delay": 0,
+            "sourceElement": "",
+            "sourceElements": [
+              "button_2"
+            ]
+          },
+          "condition": null,
+          "actions": [
+            {
+              "id": "action_1769013056492",
+              "type": "bgmStop",
+              "target": "",
+              "value": ""
+            }
+          ]
+        }
+      ],
+      "password": "",
+      "wrongPasswordStep": "",
+      "bgColor": "#000000",
+      "bgShapes": [],
+      "folderId": null
+    }
+  ],
+  "inventoryItems": [],
+  "varyingItems": []
+};
+
+const STEPS = STORY_DATA.steps;
+const INVENTORY_ITEMS = STORY_DATA.inventoryItems;
+const VARYING_ITEMS = STORY_DATA.varyingItems;
+
+let current = STEPS[0].id;
+let visible = {};
+let inventory = [];
+let varyingValues = {};
+let timers = [];
+let timerCountdowns = {};
+let hiding = {};
+let rendered = {};
+let draggedElem = null;
+let dragOffset = { x: 0, y: 0 };
+let dragPos = { x: 0, y: 0 };
+const OPTIMIZE_VIDEO = false;
+const STORAGE_KEY = "storyGameSave";
+let stepHistory = [];
+let showInvDisplay = true;
+let showVaryDisplay = true;
+let activeEmbed = null;
+
+// BGM Functions
+function playBGM() {
+    const bgm = document.getElementById("bgm");
+    if (bgm) {
+        bgm.volume = 1;
+        bgm.play().catch(() => {});
+    }
+}
+
+function stopBGM() {
+    const bgm = document.getElementById("bgm");
+    if (bgm) {
+        bgm.pause();
+        bgm.currentTime = 0;
+    }
+}
+
+function showEmbed(elemId) {
+    const s = STEPS.find(x => x.id === current);
+    const elem = s.elements.find(e => e.id === elemId);
+    if (!elem || !elem.embedUrl) return;
+    
+    activeEmbed = elemId;
+    const game = document.getElementById("game");
+    const container = document.createElement("div");
+    container.className = "embed-container";
+    container.id = "embed-" + elemId;
+    
+    const delay = elem.embedCloseDelay || 0;
+    const buttonStyle = delay > 0 ? 'display:none;' : '';
+    const buttonId = 'embed-close-' + elemId;
+    
+    container.innerHTML = '<iframe src="' + elem.embedUrl + '" ' + (elem.embedAllowNavigation ? '' : 'sandbox="allow-scripts allow-same-origin"') + '></iframe>' +
+        '<button id="' + buttonId + '" class="embed-close" style="' + buttonStyle + '" onclick="closeEmbed(\'' + elemId + '\')">✕</button>';
+    game.appendChild(container);
+    
+    // Show close button after delay
+    if (delay > 0) {
+        setTimeout(() => {
+            const btn = document.getElementById(buttonId);
+            if (btn) btn.style.display = 'flex';
+        }, delay * 1000);
+    }
+}
+
+function closeEmbed(elemId) {
+    const container = document.getElementById("embed-" + elemId);
+    if (container) container.remove();
+    activeEmbed = null;
+    
+    // Trigger onEmbedClose events
+    const s = STEPS.find(x => x.id === current);
+    s.events.forEach(ev => {
+        if (ev.trigger.type === "onEmbedClose" && ev.trigger.sourceElement === elemId && checkCond(ev.condition)) {
+            exec(ev.actions);
+        }
+    });
+}
+
+function cleanupOldMedia() {
+    // Keep last 2 steps in history, clean up everything older
+    if (stepHistory.length <= 2) return;
+    
+    const keepSteps = stepHistory.slice(-2); // Last 2 steps
+    const currentStepId = current;
+    
+    // Find all media elements from old steps (not in keepSteps or current)
+    const game = document.getElementById("game");
+    const allElements = game.querySelectorAll('[data-elem-id]');
+    
+    allElements.forEach(elemDiv => {
+        const elemId = elemDiv.getAttribute('data-elem-id');
+        
+        // Find which step this element belongs to
+        let belongsToOldStep = true;
+        STEPS.forEach(step => {
+            if (step.id === currentStepId || keepSteps.includes(step.id)) {
+                if (step.elements.some(e => e.id === elemId)) {
+                    belongsToOldStep = false;
+                }
+            }
+        });
+        
+        if (belongsToOldStep) {
+            // Clean up media before removing
+            const video = elemDiv.querySelector('video');
+            const audio = elemDiv.querySelector('audio');
+            const img = elemDiv.querySelector('img');
+            
+            if (video) {
+                video.pause();
+                video.removeAttribute('src');
+                video.load(); // Forces browser to release memory
+            }
+            if (audio) {
+                audio.pause();
+                audio.removeAttribute('src');
+                audio.load();
+            }
+            if (img) {
+                img.removeAttribute('src');
+            }
+            
+            // Remove from DOM
+            elemDiv.remove();
+        }
+    });
+}
+
+function refreshCurrentStep() {
+    const s = STEPS.find(x => x.id === current);
+    if (!s) return;
+    fullDraw();
+}
+
+function render() {
+    timers.forEach(t => clearTimeout(t));
+    timers = [];
+    timerCountdowns = {};
+    hiding = {};
+    rendered = {};
+    draggedElem = null;
+    
+    // Track step history (keep last 10 steps max)
+    if (stepHistory[stepHistory.length - 1] !== current) {
+        stepHistory.push(current);
+        if (stepHistory.length > 10) stepHistory.shift();
+    }
+    
+    // Clean up media from steps older than 2 steps back
+    cleanupOldMedia();
+    
+    const s = STEPS.find(x => x.id === current);
+    if (!s) return;
+    
+    if (s.password) {
+        const pwd = prompt("Password:");
+        if (pwd !== s.password) {
+            if (s.wrongPasswordStep) { current = s.wrongPasswordStep; render(); return; }
+            else { alert("Wrong!"); return; }
+        }
+    }
+    
+    visible = {};
+    s.elements.forEach(e => {
+        visible[e.id] = e.visible;
+        if (e.visible && e.duration && e.duration > 0) {
+            const t = setTimeout(() => hideElem(e.id), e.duration * 1000);
+            timers.push(t);
+        }
+        if (e.type === "timer" && e.visible) startTimer(e.id, e.countdown);
+    });
+    
+    s.events.forEach(ev => {
+        if (checkCond(ev.condition)) {
+            if (ev.trigger.type === "onLoad") exec(ev.actions);
+            else if (ev.trigger.type === "afterDelay") {
+                const t = setTimeout(() => exec(ev.actions), (ev.trigger.delay || 0) * 1000);
+                timers.push(t);
+            }
+        }
+    });
+    
+    fullDraw();
+}
+
+function startTimer(id, countdown) {
+    let rem = countdown;
+    timerCountdowns[id] = rem;
+    const int = setInterval(() => {
+        rem--;
+        timerCountdowns[id] = rem;
+        const timerDiv = document.querySelector('[data-elem-id="' + id + '"] .elem-timer');
+        if (timerDiv) timerDiv.textContent = rem;
+        if (rem <= 0) {
+            clearInterval(int);
+            const s = STEPS.find(x => x.id === current);
+            s.events.forEach(ev => {
+                if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === id && checkCond(ev.condition)) exec(ev.actions);
+            });
+        }
+    }, 1000);
+    timers.push(int);
+}
+
+function hideElem(id) {
+    const s = STEPS.find(x => x.id === current);
+    const elem = s.elements.find(e => e.id === id);
+    const elemDiv = document.querySelector('[data-elem-id="' + id + '"]');
+    
+    if (!elemDiv) {
+        visible[id] = false;
+        delete rendered[id];
+        return;
+    }
+    
+    const audio = elemDiv.querySelector('audio');
+    const video = elemDiv.querySelector('video');
+    if (audio) { audio.pause(); audio.currentTime = 0; }
+    if (video) { video.pause(); video.currentTime = 0; }
+    
+    const outTrans = elem && elem.transitionOut && elem.transitionOut !== "none" ? elem.transitionOut : (elem ? elem.transition : "none");
+    const outDur = elem && elem.transitionOut && elem.transitionOut !== "none" ? (elem.transitionOutDuration || 0.5) : (elem ? (elem.transitionDuration || 0.5) : 0.5);
+    
+    if (outTrans && outTrans !== "none") {
+        hiding[id] = true;
+        elemDiv.className = elemDiv.className.replace(/\btrans-[\w-]+\b/g, '').replace(/\banim-[\w-]+\b/g, '').trim() + ' trans-' + outTrans + '-out';
+        elemDiv.style.animationDuration = outDur + 's';
+        setTimeout(() => {
+            visible[id] = false;
+            hiding[id] = false;
+            delete rendered[id];
+            if (elemDiv.parentNode) elemDiv.remove();
+        }, outDur * 1000);
+    } else {
+        visible[id] = false;
+        delete rendered[id];
+        elemDiv.remove();
+    }
+}
+
+function showElem(id) {
+    if (visible[id] && rendered[id]) return;
+    visible[id] = true;
+    const s = STEPS.find(x => x.id === current);
+    const elem = s.elements.find(e => e.id === id);
+    if (elem) {
+        if (elem.type === "timer") startTimer(id, elem.countdown);
+        if (elem.duration && elem.duration > 0) {
+            const t = setTimeout(() => hideElem(id), elem.duration * 1000);
+            timers.push(t);
+        }
+        addElement(elem, true);
+    }
+}
+
+function checkCond(c) {
+    if (!c) return true;
+    if (c.type === "hasItem") {
+        const items = c.items || (c.item ? [c.item] : []);
+        if (items.length === 0) return true;
+        const logic = c.logic || 'any';
+        if (logic === 'all') return items.every(i => inventory.includes(i));
+        return items.some(i => inventory.includes(i));
+    }
+    if (c.type === "notHasItem") {
+        const items = c.items || (c.item ? [c.item] : []);
+        if (items.length === 0) return true;
+        const logic = c.logic || 'any';
+        if (logic === 'all') return !items.every(i => inventory.includes(i));
+        return items.every(i => !inventory.includes(i));
+    }
+    if (c.type === "varyingAtLeast") return (varyingValues[c.item] || 0) >= (c.amount || 0);
+    if (c.type === "varyingAtMost") return (varyingValues[c.item] || 0) <= (c.amount || 0);
+    if (c.type === "varyingBetween") return (varyingValues[c.item] || 0) >= (c.min || 0) && (varyingValues[c.item] || 0) <= (c.max || 0);
+    return true;
+}
+
+function exec(acts) {
+    acts.forEach(a => {
+        if (a.type === "show" || a.type === "showDelay") {
+            const delay = (a.type === "showDelay" && a.delay) ? a.delay * 1000 : 0;
+            const targets = a.targets && a.targets.length > 0 ? a.targets : [a.target];
+            targets.forEach(t => { if (t) setTimeout(() => showElem(t), delay); });
+        } else if (a.type === "hide" || a.type === "hideDelay") {
+            const delay = (a.type === "hideDelay" && a.delay) ? a.delay * 1000 : 0;
+            const targets = a.targets && a.targets.length > 0 ? a.targets : [a.target];
+            targets.forEach(t => { if (t) setTimeout(() => hideElem(t), delay); });
+        } else if (a.type === "goto") {
+            if (a.targets && a.targets.length > 0) current = a.targets[Math.floor(Math.random() * a.targets.length)];
+            else if (a.target) current = a.target;
+            render();
+            return;
+        } else if (a.type === "addItem" && !inventory.includes(a.target)) inventory.push(a.target);
+        else if (a.type === "removeItem") inventory = inventory.filter(x => x !== a.target);
+        else if (a.type === "addVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) + (a.amount || 0);
+        else if (a.type === "subtractVarying") varyingValues[a.target] = (varyingValues[a.target] || 0) - (a.amount || 0);
+        else if (a.type === "setVarying") varyingValues[a.target] = a.amount || 0;
+        else if (a.type === "bgmPlay") playBGM();
+        else if (a.type === "bgmStop") stopBGM();
+        else if (a.type === "showInventory") { showInvDisplay = true; }
+        else if (a.type === "hideInventory") { showInvDisplay = false; }
+        else if (a.type === "showVarying") { showVaryDisplay = true; }
+        else if (a.type === "hideVarying") { showVaryDisplay = false; }
+        else if (a.type === "saveState") {
+            const saveData = { stepId: current, inventory: inventory, varying: varyingValues };
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(saveData));
+        }
+        else if (a.type === "loadState") {
+            const saveData = localStorage.getItem(STORAGE_KEY);
+            if (saveData) {
+                const parsed = JSON.parse(saveData);
+                inventory = parsed.inventory || [];
+                varyingValues = parsed.varying || {};
+                if (parsed.stepId) { current = parsed.stepId; render(); return; }
+            }
+        }
+        else if (a.type === "clearState") {
+            localStorage.removeItem(STORAGE_KEY);
+        }
+    });
+    updateInventory();
+}
+
+function hexToRgba(hex, opacity) {
+    if (!hex || hex.startsWith('rgba')) return hex || 'rgba(0,0,0,' + opacity + ')';
+    hex = hex.replace('#', '');
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return 'rgba(' + r + ',' + g + ',' + b + ',' + opacity + ')';
+}
+
+function createElemHTML(e, withTransition) {
+    const isHiding = hiding[e.id];
+    const outTrans = e.transitionOut && e.transitionOut !== "none" ? e.transitionOut : e.transition;
+    const transClass = withTransition && e.transition && e.transition !== "none" && !isHiding ? " trans-" + e.transition : (isHiding && outTrans && outTrans !== "none" ? " trans-" + outTrans + "-out" : "");
+    const duringClass = e.animationDuring && e.animationDuring !== "none" && !isHiding ? " anim-" + e.animationDuring : "";
+    const transDur = isHiding ? (e.transitionOutDuration || e.transitionDuration || 0.5) : (e.transitionDuration || 0.5);
+    const flipScaleX = e.flipH ? -1 : 1;
+    const flipScaleY = e.flipV ? -1 : 1;
+    const rotation = e.rotation || 0;
+    const objectOpacity = (e.opacity !== undefined ? e.opacity : 100) / 100;
+    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg);opacity:" + objectOpacity : "";
+    const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s" + objectStyle;
+    const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \'' + e.id + '\')" ontouchstart="handleDragStart(event, \'' + e.id + '\')"' : "";
+    const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\'' + e.id + '\')"' : "";
+    const hotspotClass = (e.type === "hotspot" && e.showInGame) ? " elem-hotspot-visible" : "";
+    const objectClass = e.type === "object" ? " elem-object" : "";
+    const imgTransform = (e.flipH || e.flipV || rotation) ? "transform:scale(" + flipScaleX + "," + flipScaleY + ") rotate(" + rotation + "deg);" : "";
+    
+    let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + objectClass + transClass + duringClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
+    if (e.type === "image" && e.content) h += '<img src="' + e.content + '" style="' + imgTransform + 'opacity:' + ((e.opacity !== undefined ? e.opacity : 100) / 100) + ';">';
+    if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (OPTIMIZE_VIDEO ? 'preload="metadata" ' : '') + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\'' + e.id + '\')" data-video-id="' + e.id + '"><source src="' + e.content + '"></video>';
+    if (e.type === "text") {
+        const bgOpacity = e.textBgOpacity !== undefined ? e.textBgOpacity : 0.8;
+        const bgColor = hexToRgba(e.textBgColor || '#000000', bgOpacity);
+        const textStyle = 'font-size:' + (e.textSize || 24) + 'px;color:' + (e.textColor || "#ffffff") + ';background:' + bgColor + 
+            (e.textBold ? ';font-weight:bold' : '') + 
+            (e.textItalic ? ';font-style:italic' : '') + 
+            (e.textUnderline ? ';text-decoration:underline' : '') +
+            (e.textBorder ? ';border:' + (e.textBorderWidth || 2) + 'px solid ' + (e.textBorderColor || '#ffffff') : '');
+        h += '<div class="elem-text" style="' + textStyle + '">' + e.content + '</div>';
+    }
+    if (e.type === "button") {
+        const shadowStyle = e.buttonShadow ? 'box-shadow:0 4px 15px rgba(0,0,0,0.4);' : '';
+        const pulseClass = e.buttonPulse ? ' anim-buttonPulse' : '';
+        h += '<div class="elem-button' + pulseClass + '" style="background:' + e.color + ';color:' + (e.buttonTextColor || '#ffffff') + ';font-size:' + (e.buttonTextSize || 20) + 'px;' + shadowStyle + '">' + (e.content || "Button") + '</div>';
+    }
+    if (e.type === "audio" && e.content) h += '<audio ' + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\'' + e.id + '\')"><source src="' + e.content + '"></audio>';
+    if (e.type === "timer") h += '<div class="elem-timer">' + (timerCountdowns[e.id] !== undefined ? timerCountdowns[e.id] : e.countdown) + '</div>';
+    if (e.type === "draggable") {
+        if (e.contentType === "image" && e.content) h += '<img src="' + e.content + '">';
+        else h += '<div style="font-size:' + e.fontSize + 'px;color:#fff;pointer-events:none">' + (e.content || "📦") + '</div>';
+    }
+    if (e.type === "object") h += '';
+    if (e.type === "embed" && e.embedUrl) {
+        if (e.embedThumbnail) {
+            h += '<img src="' + e.embedThumbnail + '" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="showEmbed(\'' + e.id + '\')">';
+        } else {
+            h += '<div style="width:100%;height:100%;background:rgba(128,0,255,0.3);display:flex;align-items:center;justify-content:center;color:#fff;font-size:1.5rem;cursor:pointer" onclick="showEmbed(\'' + e.id + '\')">▶ Click to Open</div>';
+        }
+    }
+    h += '</div>';
+    return h;
+}
+
+function addElement(e, withTransition) {
+    if (!e || rendered[e.id]) return;
+    const game = document.getElementById("game");
+    const s = STEPS.find(x => x.id === current);
+    const temp = document.createElement('div');
+    temp.innerHTML = createElemHTML(e, withTransition);
+    const newElem = temp.firstChild;
+    
+    const existingElems = Array.from(game.querySelectorAll('[data-elem-id]'));
+    let inserted = false;
+    for (const existing of existingElems) {
+        const existingE = s.elements.find(el => el.id === existing.getAttribute('data-elem-id'));
+        if (existingE && existingE.layer > e.layer) {
+            game.insertBefore(newElem, existing);
+            inserted = true;
+            break;
+        }
+    }
+    if (!inserted) game.appendChild(newElem);
+    rendered[e.id] = true;
+}
+
+function fullDraw() {
+    const s = STEPS.find(x => x.id === current);
+    const game = document.getElementById("game");
+    game.style.background = s.bgColor || "#000";
+    let h = "";
+    
+    if (s.bgShapes) {
+        s.bgShapes.forEach(sh => {
+            h += '<div style="position:absolute;left:' + sh.x + 'px;top:' + sh.y + 'px;width:' + sh.width + 'px;height:' + sh.height + 'px;background:' + sh.color + ';border-radius:' + (sh.type === "circle" ? "50%" : "0") + ';z-index:0"></div>';
+        });
+    }
+    
+    s.elements.filter(e => visible[e.id] || hiding[e.id]).sort((a, b) => a.layer - b.layer).forEach(e => {
+        h += createElemHTML(e, true);
+        rendered[e.id] = true;
+    });
+    
+    game.innerHTML = h;
+    updateInventory();
+}
+
+function updateInventory() {
+    const inv = document.getElementById("inventory");
+    const visInv = showInvDisplay ? inventory.filter(item => {
+        const invItem = INVENTORY_ITEMS.find(i => (i.name || i) === item);
+        if (!invItem) return false;
+        if (typeof invItem === "string") return true;
+        return invItem.visible !== false;
+    }) : [];
+    const visVarying = showVaryDisplay ? VARYING_ITEMS.filter(vi => vi.visible !== false) : [];
+    
+    if (visInv.length > 0 || visVarying.length > 0) {
+        inv.style.display = "flex";
+        let html = "";
+        // Inventory items as text
+        visInv.forEach(itemName => {
+            const invItem = INVENTORY_ITEMS.find(i => (i.name || i) === itemName);
+            const displayName = invItem && invItem.displayName ? invItem.displayName : itemName;
+            html += '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold"><span style="color:#fff">• ' + displayName + '</span></div>';
+        });
+        // Varying items
+        visVarying.forEach(vi => {
+            const displayName = vi.displayName || vi.name;
+            html += '<div style="display:flex;align-items:center;gap:8px;color:#f59e0b;font-size:14px;font-weight:bold"><span style="color:#fff">' + displayName + ':</span><span>' + (varyingValues[vi.name] || 0) + '</span></div>';
+        });
+        inv.innerHTML = html;
+    } else {
+        inv.style.display = "none";
+    }
+}
+
+function getEventPos(ev) {
+    if (ev.touches && ev.touches.length > 0) {
+        return { x: ev.touches[0].clientX, y: ev.touches[0].clientY };
+    }
+    if (ev.changedTouches && ev.changedTouches.length > 0) {
+        return { x: ev.changedTouches[0].clientX, y: ev.changedTouches[0].clientY };
+    }
+    return { x: ev.clientX, y: ev.clientY };
+}
+
+function handleDragStart(ev, elemId) {
+    ev.preventDefault();
+    const s = STEPS.find(x => x.id === current);
+    const elem = s.elements.find(e => e.id === elemId);
+    if (!elem) return;
+    draggedElem = elem;
+    const rect = ev.target.getBoundingClientRect();
+    const canvas = document.getElementById("game");
+    const canvasRect = canvas.getBoundingClientRect();
+    const pos = getEventPos(ev);
+    dragOffset.x = pos.x - rect.left;
+    dragOffset.y = pos.y - rect.top;
+    dragPos.x = pos.x - canvasRect.left;
+    dragPos.y = pos.y - canvasRect.top;
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+    document.addEventListener('touchmove', handleDragMove, { passive: false });
+    document.addEventListener('touchend', handleDragEnd);
+}
+
+function handleDragMove(ev) {
+    if (!draggedElem) return;
+    ev.preventDefault();
+    const canvas = document.getElementById("game");
+    const rect = canvas.getBoundingClientRect();
+    const pos = getEventPos(ev);
+    dragPos.x = pos.x - rect.left;
+    dragPos.y = pos.y - rect.top;
+    const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
+    if (draggedDiv) {
+        draggedDiv.style.left = (dragPos.x - dragOffset.x) + 'px';
+        draggedDiv.style.top = (dragPos.y - dragOffset.y) + 'px';
+    }
+}
+
+function handleDragEnd(ev) {
+    if (!draggedElem) return;
+    const s = STEPS.find(x => x.id === current);
+    const canvas = document.getElementById("game");
+    const rect = canvas.getBoundingClientRect();
+    const pos = getEventPos(ev);
+    const dropX = pos.x - rect.left;
+    const dropY = pos.y - rect.top;
+    s.elements.filter(e => e.type === "hotspot" && visible[e.id] && e.hotspotMode !== "click").forEach(h => {
+        if (dropX >= h.x && dropX <= h.x + h.width && dropY >= h.y && dropY <= h.y + h.height) {
+            s.events.forEach(ev => {
+                if (ev.trigger.type === "onDrop" && ev.trigger.sourceElement === h.id && checkCond(ev.condition)) exec(ev.actions);
+            });
+        }
+    });
+    document.removeEventListener('mousemove', handleDragMove);
+    document.removeEventListener('mouseup', handleDragEnd);
+    document.removeEventListener('touchmove', handleDragMove);
+    document.removeEventListener('touchend', handleDragEnd);
+    const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
+    if (draggedDiv) {
+        draggedDiv.style.left = draggedElem.x + 'px';
+        draggedDiv.style.top = draggedElem.y + 'px';
+    }
+    draggedElem = null;
+}
+
+function handleVideoEnd(id) {
+    const s = STEPS.find(x => x.id === current);
+    s.events.forEach(ev => {
+        if (ev.trigger.type === "afterElement" && ev.trigger.sourceElement === id && checkCond(ev.condition)) exec(ev.actions);
+    });
+}
+
+let lastClickTime = 0;
+const CLICK_DEBOUNCE_MS = 300;
+
+function handleClick(id) {
+    const now = Date.now();
+    if (now - lastClickTime < CLICK_DEBOUNCE_MS) return;
+    lastClickTime = now;
+    
+    const s = STEPS.find(x => x.id === current);
+    s.events.forEach(ev => {
+        if (ev.trigger.type === "onClick") {
+            const sources = ev.trigger.sourceElements || (ev.trigger.sourceElement ? [ev.trigger.sourceElement] : []);
+            if (sources.includes(id) && checkCond(ev.condition)) exec(ev.actions);
+        }
+    });
+}
+
+render();
+    </script>
+</body>
+</html>
