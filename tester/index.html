@@ -823,9 +823,20 @@
                 
                 gameOverlay.classList.add('hidden');
                 
-                // Turn screen blue while holding
+                // Turn screen blue while holding and show target time
                 ctx.fillStyle = '#4a90d9';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Display target time reminder on blue screen
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 48px Quicksand, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`${t('target')}: ${targetTime}s`, canvas.width / 2, canvas.height / 2);
+                
+                // Reset text alignment
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
                 
                 timerInterval = setInterval(updateTimer, 50);
             };
@@ -945,6 +956,10 @@
                 ctx.fillText('←', 0, 0);
                 ctx.restore();
                 
+                // Reset text alignment to default
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
+                
                 arrowAnimationId = requestAnimationFrame(animateArrows);
             };
             
@@ -989,6 +1004,10 @@
                 
                 // Remove OK button
                 okButton.remove();
+                
+                // Reset canvas context to default state
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'alphabetic';
                 
                 // Transition to draw phase
                 phase = 'draw';
