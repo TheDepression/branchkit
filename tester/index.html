@@ -477,7 +477,7 @@
                 <div class="player-name">Player: <span id="displayName"></span></div>
                 <div class="best-score">Best Score: <span id="bestScore">--</span>%</div>
                 <div class="home-link">
-                    <a href="https://hirakatajin.com">← Back to 枚方人.com</a>
+                    <a href="https://hirakatajin.com">← Back to Homepage</a>
                 </div>
             </div>
         </div>
@@ -541,6 +541,7 @@
                 thisLineIs: 'This line is',
                 pixelsLong: 'pixels long',
                 rememberLength: 'Remember this length...',
+                okBegin: 'OK, Begin',
                 drawLine: 'Draw a line',
                 touchAndDrag: 'Touch and drag to draw',
                 yourLine: 'Your line',
@@ -580,6 +581,7 @@
                 thisLineIs: 'この線は',
                 pixelsLong: 'ピクセルです',
                 rememberLength: 'この長さを覚えて...',
+                okBegin: 'OK、始める',
                 drawLine: '線を描いて',
                 touchAndDrag: 'タッチしてドラッグ',
                 yourLine: 'あなたの線',
@@ -876,6 +878,7 @@
             let phase = 'show'; // show, draw
             let drawPoints = [];
             let isDrawing = false;
+            let arrowAnimationId = null;
 
             // Show reference line (100px)
             gameInstruction.innerHTML = `${t('thisLineIs')} <strong style="color: red; font-size: 1.2em;">100</strong> ${t('pixelsLong')}`;
@@ -883,22 +886,116 @@
             gameOverlay.classList.remove('hidden');
             
             clearCanvas();
-            ctx.strokeStyle = '#333';
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.beginPath();
-            const refY = canvas.height / 2 + 60; // Moved down 60px
+            
+            const refY = canvas.height / 2 + 60;
             const refX = (canvas.width - 100) / 2;
-            ctx.moveTo(refX, refY);
-            ctx.lineTo(refX + 100, refY);
-            ctx.stroke();
-
-            setTimeout(() => {
+            
+            // Draw the reference line
+            const drawReferenceLine = () => {
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.beginPath();
+                ctx.moveTo(refX, refY);
+                ctx.lineTo(refX + 100, refY);
+                ctx.stroke();
+            };
+            
+            drawReferenceLine();
+            
+            // Animate pulsing arrows pointing at the line
+            let pulsePhase = 0;
+            const animateArrows = () => {
+                clearCanvas();
+                drawReferenceLine();
+                
+                pulsePhase += 0.1;
+                const pulse = Math.sin(pulsePhase) * 0.3 + 0.7; // Oscillates between 0.4 and 1.0
+                const offset = Math.sin(pulsePhase) * 5; // Arrows move in/out slightly
+                
+                ctx.fillStyle = `rgba(255, 0, 0, ${pulse})`;
+                ctx.font = 'bold 30px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                const lineCenterX = refX + 50;
+                const lineCenterY = refY;
+                
+                // Arrow from top
+                ctx.save();
+                ctx.translate(lineCenterX, lineCenterY - 50 + offset);
+                ctx.fillText('↓', 0, 0);
+                ctx.restore();
+                
+                // Arrow from bottom
+                ctx.save();
+                ctx.translate(lineCenterX, lineCenterY + 50 - offset);
+                ctx.fillText('↑', 0, 0);
+                ctx.restore();
+                
+                // Arrow from left
+                ctx.save();
+                ctx.translate(refX - 40 + offset, lineCenterY);
+                ctx.fillText('→', 0, 0);
+                ctx.restore();
+                
+                // Arrow from right
+                ctx.save();
+                ctx.translate(refX + 100 + 40 - offset, lineCenterY);
+                ctx.fillText('←', 0, 0);
+                ctx.restore();
+                
+                arrowAnimationId = requestAnimationFrame(animateArrows);
+            };
+            
+            arrowAnimationId = requestAnimationFrame(animateArrows);
+            
+            // Create OK button
+            const okButton = document.createElement('button');
+            okButton.textContent = t('okBegin');
+            okButton.style.cssText = `
+                position: absolute;
+                bottom: 25%;
+                left: 50%;
+                transform: translateX(-50%);
+                font-family: 'Quicksand', sans-serif;
+                font-weight: 600;
+                font-size: 1.2rem;
+                padding: 15px 50px;
+                background: linear-gradient(135deg, #ff8c00, #ff6b00);
+                color: white;
+                border: none;
+                border-radius: 50px;
+                cursor: pointer;
+                box-shadow: 0 4px 15px rgba(255, 140, 0, 0.4);
+                z-index: 30;
+                transition: transform 0.2s, box-shadow 0.2s;
+            `;
+            okButton.addEventListener('mouseenter', () => {
+                okButton.style.transform = 'translateX(-50%) translateY(-2px)';
+                okButton.style.boxShadow = '0 6px 20px rgba(255, 140, 0, 0.5)';
+            });
+            okButton.addEventListener('mouseleave', () => {
+                okButton.style.transform = 'translateX(-50%)';
+                okButton.style.boxShadow = '0 4px 15px rgba(255, 140, 0, 0.4)';
+            });
+            
+            gameScreen.appendChild(okButton);
+            
+            // OK button click handler
+            okButton.addEventListener('click', () => {
+                // Stop arrow animation
+                cancelAnimationFrame(arrowAnimationId);
+                
+                // Remove OK button
+                okButton.remove();
+                
+                // Transition to draw phase
                 phase = 'draw';
                 clearCanvas();
                 gameInstruction.innerHTML = `${t('drawLine')} <strong style="color: red; font-size: 1.2em;">${targetLength}</strong> px`;
                 gameSubtitle.textContent = t('touchAndDrag');
-            }, 5000);
+            });
 
             const getPos = (e) => {
                 const rect = canvas.getBoundingClientRect();
@@ -1114,6 +1211,14 @@
             };
             
             generateShapePoints();
+            
+            // Calculate target perimeter (total length of the shape path)
+            let targetPerimeter = 0;
+            for (let i = 1; i < shapePoints.length; i++) {
+                const dx = shapePoints[i].x - shapePoints[i-1].x;
+                const dy = shapePoints[i].y - shapePoints[i-1].y;
+                targetPerimeter += Math.sqrt(dx * dx + dy * dy);
+            }
 
             // Draw the guide shape
             const drawGuideShape = (opacity = 1) => {
@@ -1210,7 +1315,49 @@
                 if (!isDrawing) return;
                 isDrawing = false;
                 
-                // Score based on how well they stayed on the track
+                // Calculate player's drawn line length
+                let drawnLength = 0;
+                for (let i = 1; i < drawPoints.length; i++) {
+                    const dx = drawPoints[i].x - drawPoints[i-1].x;
+                    const dy = drawPoints[i].y - drawPoints[i-1].y;
+                    drawnLength += Math.sqrt(dx * dx + dy * dy);
+                }
+                
+                // AUTO ZERO: If drawn length is less than half of target, no points
+                if (drawnLength < targetPerimeter * 0.5) {
+                    state.scores[2] = 0;
+                    
+                    canvas.removeEventListener('mousedown', startDraw);
+                    canvas.removeEventListener('touchstart', startDraw);
+                    canvas.removeEventListener('mousemove', moveDraw);
+                    canvas.removeEventListener('touchmove', moveDraw);
+                    canvas.removeEventListener('mouseup', endDraw);
+                    canvas.removeEventListener('touchend', endDraw);
+                    
+                    // Show the actual shape vs their drawing
+                    clearCanvas();
+                    drawGuideShape(1);
+                    
+                    ctx.strokeStyle = '#ff8c00';
+                    ctx.lineWidth = 4;
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+                    ctx.beginPath();
+                    ctx.moveTo(drawPoints[0].x, drawPoints[0].y);
+                    for (let i = 1; i < drawPoints.length; i++) {
+                        ctx.lineTo(drawPoints[i].x, drawPoints[i].y);
+                    }
+                    ctx.stroke();
+                    
+                    gameSubtitle.textContent = `${t(selectedShape)} ${t('accuracy')}: 0% (too short)`;
+                    gameOverlay.classList.remove('hidden');
+                    gameInstruction.textContent = '';
+                    
+                    showStageScore(0, () => runStage(3));
+                    return;
+                }
+                
+                // Score component 1: How well they stayed on the track (0-100)
                 let pointsOnTrack = 0;
                 let totalPoints = drawPoints.length;
                 
@@ -1221,13 +1368,22 @@
                     }
                 }
                 
+                const zoneScore = totalPoints > 0 ? (pointsOnTrack / totalPoints) * 100 : 0;
+                
+                // Score component 2: How close their line length is to target perimeter (0-100)
+                const lengthDiff = Math.abs(drawnLength - targetPerimeter);
+                const lengthScore = Math.max(0, 100 - (lengthDiff / targetPerimeter) * 100);
+                
                 // Check if they completed the shape (ended near start)
                 const endPoint = drawPoints[drawPoints.length - 1];
                 const endNearStart = isNearStart(endPoint);
                 
-                let score = (pointsOnTrack / totalPoints) * 100;
+                // Combo score: 50% zone accuracy + 50% length accuracy
+                let score = (zoneScore * 0.5) + (lengthScore * 0.5);
+                
+                // Penalty for not completing (not ending near start)
                 if (!endNearStart && drawPoints.length > 50) {
-                    score *= 0.7; // Penalty for not completing
+                    score *= 0.7;
                 }
                 
                 score = Math.max(0, Math.min(100, score));
