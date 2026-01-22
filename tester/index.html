@@ -146,6 +146,57 @@
             transform: translateY(0) scale(0.98);
         }
 
+        .lang-toggle {
+            display: flex;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .lang-btn {
+            font-family: 'Quicksand', sans-serif;
+            font-size: 1rem;
+            padding: 8px 20px;
+            background: transparent;
+            border: 2px solid #ddd;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #666;
+        }
+
+        .lang-btn.active {
+            background: #ff8c00;
+            border-color: #ff8c00;
+            color: white;
+        }
+
+        .lang-btn:hover:not(.active) {
+            border-color: #ff8c00;
+            color: #ff8c00;
+        }
+
+        .refresh-btn {
+            font-size: 1.2rem;
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 5px;
+            margin-left: 10px;
+            opacity: 0.7;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .refresh-btn:hover {
+            opacity: 1;
+            transform: rotate(180deg);
+        }
+
+        .stage-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .bottom-info {
             text-align: center;
             color: #666;
@@ -251,14 +302,20 @@
         }
 
         /* Stage indicator */
-        .stage-indicator {
+        .stage-header {
             position: absolute;
-            top: 20px;
+            top: 15px;
             left: 50%;
             transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 15;
+        }
+
+        .stage-indicator {
             font-size: 0.9rem;
             color: #999;
-            z-index: 15;
         }
 
         /* Results Screen */
@@ -409,7 +466,13 @@
             <div class="title-container">
                 <h1 class="main-title">Sense Test</h1>
             </div>
-            <button class="start-btn" id="startBtn">Start</button>
+            <div style="display: flex; flex-direction: column; align-items: center;">
+                <button class="start-btn" id="startBtn">Start</button>
+                <div class="lang-toggle">
+                    <button class="lang-btn active" id="langEn">English</button>
+                    <button class="lang-btn" id="langJa">日本語</button>
+                </div>
+            </div>
             <div class="bottom-info">
                 <div class="player-name">Player: <span id="displayName"></span></div>
                 <div class="best-score">Best Score: <span id="bestScore">--</span>%</div>
@@ -422,7 +485,10 @@
         <!-- Game Screen -->
         <div id="gameScreen">
             <canvas id="gameCanvas"></canvas>
-            <div class="stage-indicator" id="stageIndicator"></div>
+            <div class="stage-header">
+                <span class="stage-indicator" id="stageIndicator"></span>
+                <button class="refresh-btn" id="refreshBtn" title="Refresh">🔄</button>
+            </div>
             <div class="game-overlay" id="gameOverlay">
                 <div class="game-instruction" id="gameInstruction"></div>
                 <div class="game-subtitle" id="gameSubtitle"></div>
@@ -456,8 +522,93 @@
             bestScore: null,
             currentStage: 0,
             scores: [0, 0, 0, 0],
-            bgmStarted: false
+            bgmStarted: false,
+            lang: 'en' // 'en' or 'ja'
         };
+
+        // Translations
+        const translations = {
+            en: {
+                stage1: 'Stage 1 of 4: Time Sense',
+                stage2: 'Stage 2 of 4: Length Sense',
+                stage3: 'Stage 3 of 4: Shape Sense',
+                stage4: 'Stage 4 of 4: Invisible Rabbit',
+                holdScreen: 'Hold the screen for exactly',
+                seconds: 'seconds',
+                touchToBegin: 'Touch anywhere to begin',
+                target: 'Target',
+                yourTime: 'Your time',
+                thisLineIs: 'This line is',
+                pixelsLong: 'pixels long',
+                rememberLength: 'Remember this length...',
+                drawLine: 'Draw a line',
+                touchAndDrag: 'Touch and drag to draw',
+                yourLine: 'Your line',
+                drawPerfect: 'Draw a perfect',
+                startAtOrange: 'Start at the orange dot, go clockwise',
+                accuracy: 'accuracy',
+                watchRabbit: '🐰 Watch the rabbit\'s pattern',
+                movesConstant: 'It moves around the square at constant speed',
+                rabbitFading: 'Rabbit fading...',
+                touchNow: 'Touch!',
+                orangeTouch: 'Orange = your touch, 🐰 = actual position',
+                timeRanOut: 'Time ran out!',
+                finalResults: 'Final Results',
+                newRecord: '🎉 New Personal Best! 🎉',
+                playAgain: 'Play Again',
+                pts: 'pts',
+                circle: 'circle',
+                square: 'square',
+                triangle: 'triangle',
+                oval: 'oval',
+                rectangle: 'rectangle',
+                timeSense: 'Time Sense',
+                lengthSense: 'Length Sense',
+                shapeSense: 'Shape Sense',
+                rabbitChase: 'Rabbit Chase'
+            },
+            ja: {
+                stage1: 'ステージ 1/4: 時間感覚',
+                stage2: 'ステージ 2/4: 長さ感覚',
+                stage3: 'ステージ 3/4: 形感覚',
+                stage4: 'ステージ 4/4: 透明うさぎ',
+                holdScreen: '画面を押し続けてください',
+                seconds: '秒間',
+                touchToBegin: 'どこでもタッチして開始',
+                target: '目標',
+                yourTime: 'あなたの時間',
+                thisLineIs: 'この線は',
+                pixelsLong: 'ピクセルです',
+                rememberLength: 'この長さを覚えて...',
+                drawLine: '線を描いて',
+                touchAndDrag: 'タッチしてドラッグ',
+                yourLine: 'あなたの線',
+                drawPerfect: '完璧な形を描いて',
+                startAtOrange: 'オレンジの点から時計回りに',
+                accuracy: '正確さ',
+                watchRabbit: '🐰 うさぎのパターンを見て',
+                movesConstant: '一定の速度で四角を回ります',
+                rabbitFading: 'うさぎが消えていく...',
+                touchNow: 'タッチ！',
+                orangeTouch: 'オレンジ = あなたのタッチ、🐰 = 実際の位置',
+                timeRanOut: '時間切れ！',
+                finalResults: '最終結果',
+                newRecord: '🎉 新記録！ 🎉',
+                playAgain: 'もう一度',
+                pts: '点',
+                circle: '円',
+                square: '正方形',
+                triangle: '三角形',
+                oval: '楕円',
+                rectangle: '長方形',
+                timeSense: '時間感覚',
+                lengthSense: '長さ感覚',
+                shapeSense: '形感覚',
+                rabbitChase: 'うさぎ追跡'
+            }
+        };
+
+        const t = (key) => translations[state.lang][key] || key;
 
         // DOM Elements
         const nameScreen = document.getElementById('nameScreen');
@@ -483,6 +634,9 @@
         const newRecord = document.getElementById('newRecord');
         const playAgainBtn = document.getElementById('playAgainBtn');
         const bgm = document.getElementById('bgm');
+        const langEn = document.getElementById('langEn');
+        const langJa = document.getElementById('langJa');
+        const refreshBtn = document.getElementById('refreshBtn');
 
         // Initialize
         function init() {
@@ -501,6 +655,7 @@
             state.playerName = localStorage.getItem('senseTestName') || '';
             const saved = localStorage.getItem('senseTestBest');
             state.bestScore = saved ? parseFloat(saved) : null;
+            state.lang = localStorage.getItem('senseTestLang') || 'en';
         }
 
         function saveData() {
@@ -528,6 +683,25 @@
             playAgainBtn.addEventListener('click', () => {
                 showMenu();
             });
+            
+            // Language toggle
+            langEn.addEventListener('click', () => {
+                state.lang = 'en';
+                langEn.classList.add('active');
+                langJa.classList.remove('active');
+                localStorage.setItem('senseTestLang', 'en');
+            });
+            langJa.addEventListener('click', () => {
+                state.lang = 'ja';
+                langJa.classList.add('active');
+                langEn.classList.remove('active');
+                localStorage.setItem('senseTestLang', 'ja');
+            });
+            
+            // Refresh button
+            refreshBtn.addEventListener('click', () => {
+                location.reload();
+            });
         }
 
         function submitName() {
@@ -549,6 +723,15 @@
             displayName.textContent = state.playerName;
             bestScoreEl.textContent = state.bestScore !== null ? Math.round(state.bestScore) : '--';
             menuScreen.style.display = 'flex';
+            
+            // Set language toggle state
+            if (state.lang === 'ja') {
+                langJa.classList.add('active');
+                langEn.classList.remove('active');
+            } else {
+                langEn.classList.add('active');
+                langJa.classList.remove('active');
+            }
         }
 
         function hideAllScreens() {
@@ -605,16 +788,15 @@
 
         // ==================== STAGE 1: TIME SENSE ====================
         function runTimeStage() {
-            stageIndicator.textContent = 'Stage 1 of 4: Time Sense';
+            stageIndicator.textContent = t('stage1');
             
             const targetTime = Math.floor(Math.random() * 16) + 10; // 10-25 seconds
             const maxTime = targetTime * 2;
             
-            gameInstruction.textContent = `Hold the screen for exactly ${targetTime} seconds`;
-            gameSubtitle.textContent = 'Touch anywhere to begin';
+            gameInstruction.innerHTML = `${t('holdScreen')} <strong style="color: #ff8c00;">${targetTime}</strong> ${t('seconds')}`;
+            gameSubtitle.textContent = t('touchToBegin');
             gameOverlay.classList.remove('hidden');
             timerDisplay.classList.add('hidden');
-            timerDisplay.classList.remove('fade-out');
             
             let startTime = null;
             let timerInterval = null;
@@ -624,7 +806,6 @@
             const updateTimer = () => {
                 if (!startTime) return;
                 const elapsed = (Date.now() - startTime) / 1000;
-                timerDisplay.textContent = elapsed.toFixed(1);
                 
                 if (elapsed >= maxTime) {
                     endHold(maxTime);
@@ -639,16 +820,12 @@
                 startTime = Date.now();
                 
                 gameOverlay.classList.add('hidden');
-                timerDisplay.classList.remove('hidden');
-                timerDisplay.style.opacity = '1';
-                timerDisplay.textContent = '0.0';
+                
+                // Turn screen blue while holding
+                ctx.fillStyle = '#4a90d9';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
                 timerInterval = setInterval(updateTimer, 50);
-                
-                // Fade out timer after 2 seconds
-                setTimeout(() => {
-                    timerDisplay.style.opacity = '0';
-                }, 2000);
             };
 
             const endHold = (overrideTime = null) => {
@@ -656,6 +833,9 @@
                 isHolding = false;
                 
                 clearInterval(timerInterval);
+                
+                // Return to white
+                clearCanvas();
                 
                 const elapsed = overrideTime || (Date.now() - startTime) / 1000;
                 const diff = Math.abs(elapsed - targetTime);
@@ -675,8 +855,7 @@
                 canvas.removeEventListener('mouseup', endHold);
                 canvas.removeEventListener('touchend', endHold);
                 
-                timerDisplay.classList.add('hidden');
-                gameSubtitle.textContent = `Target: ${targetTime}s | Your time: ${elapsed.toFixed(1)}s`;
+                gameSubtitle.textContent = `${t('target')}: ${targetTime}s | ${t('yourTime')}: ${elapsed.toFixed(1)}s`;
                 gameOverlay.classList.remove('hidden');
                 gameInstruction.textContent = '';
                 
@@ -691,7 +870,7 @@
 
         // ==================== STAGE 2: LENGTH SENSE ====================
         function runLengthStage() {
-            stageIndicator.textContent = 'Stage 2 of 4: Length Sense';
+            stageIndicator.textContent = t('stage2');
             
             const targetLength = Math.floor(Math.random() * 501) + 200; // 200-700px
             let phase = 'show'; // show, draw
@@ -699,8 +878,8 @@
             let isDrawing = false;
 
             // Show reference line (100px)
-            gameInstruction.textContent = 'This line is 100 pixels long';
-            gameSubtitle.textContent = 'Remember this length...';
+            gameInstruction.innerHTML = `${t('thisLineIs')} <strong style="color: red; font-size: 1.2em;">100</strong> ${t('pixelsLong')}`;
+            gameSubtitle.textContent = t('rememberLength');
             gameOverlay.classList.remove('hidden');
             
             clearCanvas();
@@ -708,7 +887,7 @@
             ctx.lineWidth = 4;
             ctx.lineCap = 'round';
             ctx.beginPath();
-            const refY = canvas.height / 2;
+            const refY = canvas.height / 2 + 60; // Moved down 60px
             const refX = (canvas.width - 100) / 2;
             ctx.moveTo(refX, refY);
             ctx.lineTo(refX + 100, refY);
@@ -717,8 +896,8 @@
             setTimeout(() => {
                 phase = 'draw';
                 clearCanvas();
-                gameInstruction.textContent = `Draw a line ${targetLength} pixels long`;
-                gameSubtitle.textContent = 'Touch and drag to draw';
+                gameInstruction.innerHTML = `${t('drawLine')} <strong style="color: red; font-size: 1.2em;">${targetLength}</strong> px`;
+                gameSubtitle.textContent = t('touchAndDrag');
             }, 5000);
 
             const getPos = (e) => {
@@ -788,7 +967,7 @@
                 canvas.removeEventListener('mouseup', endDraw);
                 canvas.removeEventListener('touchend', endDraw);
                 
-                gameSubtitle.textContent = `Target: ${targetLength}px | Your line: ${Math.round(totalLength)}px`;
+                gameSubtitle.textContent = `${t('target')}: ${targetLength}px | ${t('yourLine')}: ${Math.round(totalLength)}px`;
                 gameOverlay.classList.remove('hidden');
                 gameInstruction.textContent = '';
                 
@@ -805,12 +984,12 @@
 
         // ==================== STAGE 3: SHAPE SENSE ====================
         function runCircleStage() {
-            stageIndicator.textContent = 'Stage 3 of 4: Shape Sense';
+            stageIndicator.textContent = t('stage3');
             
             const centerX = canvas.width / 2;
             const centerY = canvas.height / 2;
-            const baseSize = Math.min(canvas.width, canvas.height) * 0.35;
-            const trackWidth = 20;
+            const baseSize = Math.min(canvas.width, canvas.height) * 0.37; // 5% larger (was 0.35)
+            const trackWidth = 18; // 10% thinner (was 20)
             
             // Randomly select a shape
             const shapes = ['circle', 'square', 'triangle', 'oval', 'rectangle'];
@@ -822,8 +1001,8 @@
             let shapePoints = []; // Points that define the shape path
             let startPoint = { x: 0, y: 0 };
 
-            gameInstruction.textContent = `Draw a perfect ${selectedShape}`;
-            gameSubtitle.textContent = 'Start at the orange dot, go clockwise';
+            gameInstruction.textContent = `${t('drawPerfect')} ${t(selectedShape)}`;
+            gameSubtitle.textContent = t('startAtOrange');
             gameOverlay.classList.remove('hidden');
 
             // Generate shape points and find start point
@@ -1076,7 +1255,7 @@
                 }
                 ctx.stroke();
                 
-                gameSubtitle.textContent = `${selectedShape.charAt(0).toUpperCase() + selectedShape.slice(1)} accuracy: ${Math.round(score)}%`;
+                gameSubtitle.textContent = `${t(selectedShape)} ${t('accuracy')}: ${Math.round(score)}%`;
                 gameOverlay.classList.remove('hidden');
                 gameInstruction.textContent = '';
                 
@@ -1093,7 +1272,7 @@
 
         // ==================== STAGE 4: RABBIT CHASE ====================
         function runRabbitStage() {
-            stageIndicator.textContent = 'Stage 4 of 4: Invisible Rabbit';
+            stageIndicator.textContent = t('stage4');
             
             // Square track parameters
             const padding = 60;
@@ -1138,8 +1317,8 @@
             let canTouch = false;
             let touchTimeout = null;
 
-            gameInstruction.textContent = '🐰 Watch the rabbit\'s pattern';
-            gameSubtitle.textContent = 'It moves around the square at constant speed';
+            gameInstruction.textContent = t('watchRabbit');
+            gameSubtitle.textContent = t('movesConstant');
             gameOverlay.classList.remove('hidden');
 
             const drawTrack = () => {
@@ -1212,7 +1391,7 @@
                     
                     if (!fadeStartTime && Date.now() - animStartTime > watchDuration) {
                         fadeStartTime = Date.now();
-                        gameInstruction.textContent = 'Rabbit fading...';
+                        gameInstruction.textContent = t('rabbitFading');
                     }
                     
                     if (fadeStartTime) {
@@ -1247,7 +1426,7 @@
                     
                     if (countdownValue < 0) {
                         clearInterval(countInterval);
-                        countdown.textContent = 'Touch!';
+                        countdown.textContent = t('touchNow');
                         setTimeout(() => {
                             countdown.classList.add('hidden');
                             phase = 'play';
@@ -1343,13 +1522,28 @@
                 return dist;
             };
 
+            const isOnTrack = (x, y) => {
+                // Check if point is within trackWidth distance of the track path
+                const closestPoint = getTrackPosition(x, y);
+                const dx = x - closestPoint.x;
+                const dy = y - closestPoint.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                return dist <= trackWidth / 2 + 10; // Small tolerance
+            };
+
             const handleTouch = (e) => {
                 if (!canTouch || phase !== 'play') return;
                 e.preventDefault();
-                canTouch = false;
-                clearTimeout(touchTimeout);
                 
                 const pos = getPos(e);
+                
+                // Only register touch if on the track
+                if (!isOnTrack(pos.x, pos.y)) {
+                    return; // Ignore touches outside the track
+                }
+                
+                canTouch = false;
+                clearTimeout(touchTimeout);
                 endGame(pos);
             };
 
@@ -1390,7 +1584,7 @@
                 canvas.removeEventListener('mousedown', handleTouch);
                 canvas.removeEventListener('touchstart', handleTouch);
                 
-                gameSubtitle.textContent = touchPos ? 'Orange = your touch, 🐰 = actual position' : 'Time ran out!';
+                gameSubtitle.textContent = touchPos ? t('orangeTouch') : t('timeRanOut');
                 gameOverlay.classList.remove('hidden');
                 gameInstruction.textContent = '';
                 
@@ -1411,10 +1605,15 @@
             
             finalScore.textContent = percentage + '%';
             
-            const stageNames = ['Time Sense', 'Length Sense', 'Shape Sense', 'Rabbit Chase'];
+            const stageNames = [t('timeSense'), t('lengthSense'), t('shapeSense'), t('rabbitChase')];
             scoreBreakdown.innerHTML = state.scores.map((score, i) => 
-                `<div class="score-item">${stageNames[i]}: ${Math.round(score)} pts</div>`
+                `<div class="score-item">${stageNames[i]}: ${Math.round(score)} ${t('pts')}</div>`
             ).join('');
+            
+            // Update results screen text
+            document.querySelector('.results-title').textContent = t('finalResults');
+            newRecord.textContent = t('newRecord');
+            playAgainBtn.textContent = t('playAgain');
             
             // Check for new record
             if (state.bestScore === null || percentage > state.bestScore) {
