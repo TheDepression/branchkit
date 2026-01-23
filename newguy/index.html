@@ -6,8 +6,8 @@
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; overflow: hidden; }
-        .canvas { width: 1024px; height: 576px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transform-origin: center center; }
-        @media (orientation: landscape) { .canvas { transform: translate(-50%, -50%) scale(0.85); } }
+        .canvas { width: 576px; height: 1024px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transform-origin: center center; }
+        
         .elem { position: absolute; }
         .elem img, .elem video { width: 100%; height: 100%; object-fit: cover; }
         .elem video { pointer-events: none; }
@@ -85,57 +85,11 @@ const STORY_DATA = {
       "title": "Step 1",
       "elements": [
         {
-          "id": "image_1",
-          "type": "image",
-          "label": "image1",
-          "x": 0,
-          "y": 0,
-          "width": 1024,
-          "height": 576,
-          "content": "http://satmis.hirakatajin.com/yakiko.PNG",
-          "visible": true,
-          "layer": 0,
-          "duration": 0,
-          "loop": false,
-          "autoplay": false,
-          "shape": "rect",
-          "color": "#f7931a",
-          "countdown": 10,
-          "fontSize": 24,
-          "contentType": "text",
-          "hotspotMode": "both",
-          "transition": "none",
-          "transitionDuration": 0.5,
-          "transitionOut": "none",
-          "transitionOutDuration": 0.5,
-          "animationDuring": "none",
-          "textColor": "#ffffff",
-          "textBgColor": "rgba(0,0,0,0.8)",
-          "textSize": 24,
-          "buttonTextColor": "#ffffff",
-          "buttonTextSize": 20,
-          "buttonShadow": false,
-          "buttonPulse": false,
-          "objectShape": "rect",
-          "objectColor": "#f7931a",
-          "scaleX": 1,
-          "scaleY": 1,
-          "rotation": 0,
-          "flipH": false,
-          "flipV": false,
-          "opacity": 100,
-          "textBgOpacity": 80,
-          "embedUrl": "",
-          "embedAllowNavigation": false,
-          "embedThumbnail": "",
-          "embedCloseDelay": 0
-        },
-        {
           "id": "button_1",
           "type": "button",
           "label": "button1",
-          "x": 156.67688060731533,
-          "y": 134.38509316770188,
+          "x": 148.54989648033117,
+          "y": 46.613664596273324,
           "width": 300,
           "height": 60,
           "content": "",
@@ -180,8 +134,8 @@ const STORY_DATA = {
           "id": "text_1",
           "type": "text",
           "label": "text1",
-          "x": 654.9316770186335,
-          "y": 301.9378881987577,
+          "x": 136.43008971704623,
+          "y": 849.6966183574879,
           "width": 300,
           "height": 100,
           "content": "hello\n",
@@ -221,9 +175,75 @@ const STORY_DATA = {
           "embedAllowNavigation": false,
           "embedThumbnail": "",
           "embedCloseDelay": 0
+        },
+        {
+          "id": "video_1",
+          "type": "video",
+          "label": "video1",
+          "x": 0,
+          "y": 192.64761904761906,
+          "width": 576,
+          "height": 369.7396825396826,
+          "content": "http://satmis.hirakatajin.com/smcok.mp4",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": true,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
         }
       ],
       "events": [
+        {
+          "id": "event_1769162073109",
+          "trigger": {
+            "type": "onLoad",
+            "delay": 0,
+            "sourceElement": ""
+          },
+          "condition": null,
+          "actions": [
+            {
+              "id": "action_1769162079859",
+              "type": "hide",
+              "target": "",
+              "value": "",
+              "targets": [
+                "video_1"
+              ]
+            }
+          ]
+        },
         {
           "id": "event_1769160199267",
           "trigger": {
@@ -241,11 +261,12 @@ const STORY_DATA = {
           "actions": [
             {
               "id": "action_1769160206033",
-              "type": "hide",
+              "type": "show",
               "target": "",
               "value": "",
               "targets": [
-                "text_1"
+                "text_1",
+                "video_1"
               ]
             }
           ]
@@ -253,7 +274,7 @@ const STORY_DATA = {
       ],
       "password": "",
       "wrongPasswordStep": "",
-      "bgColor": "#000000",
+      "bgColor": "#00fdff",
       "bgShapes": [],
       "folderId": null
     }
