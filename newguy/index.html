@@ -227,6 +227,52 @@ const STORY_DATA = {
           "embedAllowNavigation": false,
           "embedThumbnail": "",
           "embedCloseDelay": 0
+        },
+        {
+          "id": "button_2",
+          "type": "button",
+          "label": "button2",
+          "x": 148.76190476190476,
+          "y": 610.3746031746032,
+          "width": 300,
+          "height": 60,
+          "content": "yo",
+          "visible": true,
+          "layer": 0,
+          "duration": 0,
+          "loop": false,
+          "autoplay": false,
+          "shape": "rect",
+          "color": "#f7931a",
+          "countdown": 10,
+          "fontSize": 24,
+          "contentType": "text",
+          "hotspotMode": "both",
+          "transition": "none",
+          "transitionDuration": 0.5,
+          "transitionOut": "none",
+          "transitionOutDuration": 0.5,
+          "animationDuring": "none",
+          "textColor": "#ffffff",
+          "textBgColor": "rgba(0,0,0,0.8)",
+          "textSize": 24,
+          "buttonTextColor": "#ffffff",
+          "buttonTextSize": 20,
+          "buttonShadow": false,
+          "buttonPulse": false,
+          "objectShape": "rect",
+          "objectColor": "#f7931a",
+          "scaleX": 1,
+          "scaleY": 1,
+          "rotation": 0,
+          "flipH": false,
+          "flipV": false,
+          "opacity": 100,
+          "textBgOpacity": 80,
+          "embedUrl": "",
+          "embedAllowNavigation": false,
+          "embedThumbnail": "",
+          "embedCloseDelay": 0
         }
       ],
       "events": [
@@ -264,15 +310,27 @@ const STORY_DATA = {
             "type": "hasItem",
             "item": ""
           },
+          "actions": []
+        },
+        {
+          "id": "event_1769168477247",
+          "trigger": {
+            "type": "onClick",
+            "delay": 0,
+            "sourceElement": "",
+            "sourceElements": [
+              "button_2"
+            ]
+          },
+          "condition": null,
           "actions": [
             {
-              "id": "action_1769160206033",
-              "type": "show",
+              "id": "action_1769168484146",
+              "type": "hide",
               "target": "",
               "value": "",
               "targets": [
-                "text_1",
-                "video_1"
+                "text_1"
               ]
             }
           ]
