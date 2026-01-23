@@ -2,18 +2,14 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Story</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { background: #000; overflow: hidden; }
         .canvas { width: 576px; height: 1024px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transform-origin: center center; }
         
-        @media screen {
-            .canvas {
-                width: min(576px, 100vw, calc(100vh * 0.5625));
-                height: min(1024px, 100vh, calc(100vw / 0.5625));
-            }
-        }
+        .canvas { transform-origin: center center; }
         .elem { position: absolute; }
         .elem img, .elem video { width: 100%; height: 100%; object-fit: cover; }
         .elem video { pointer-events: none; }
@@ -229,14 +225,14 @@ const STORY_DATA = {
           "embedCloseDelay": 0
         },
         {
-          "id": "button_2",
-          "type": "button",
-          "label": "button2",
-          "x": 148.76190476190476,
-          "y": 610.3746031746032,
+          "id": "text_2",
+          "type": "text",
+          "label": "text2",
+          "x": 143.88571428571427,
+          "y": 638.0063492063492,
           "width": 300,
-          "height": 60,
-          "content": "yo",
+          "height": 100,
+          "content": "new?",
           "visible": true,
           "layer": 0,
           "duration": 0,
@@ -310,27 +306,15 @@ const STORY_DATA = {
             "type": "hasItem",
             "item": ""
           },
-          "actions": []
-        },
-        {
-          "id": "event_1769168477247",
-          "trigger": {
-            "type": "onClick",
-            "delay": 0,
-            "sourceElement": "",
-            "sourceElements": [
-              "button_2"
-            ]
-          },
-          "condition": null,
           "actions": [
             {
-              "id": "action_1769168484146",
-              "type": "hide",
+              "id": "action_1769160206033",
+              "type": "show",
               "target": "",
               "value": "",
               "targets": [
-                "text_1"
+                "text_1",
+                "video_1"
               ]
             }
           ]
@@ -924,6 +908,21 @@ function handleClick(id) {
 }
 
 render();
+
+function fitCanvasToViewport() {
+    const canvas = document.getElementById("game");
+    const cw = 576;
+    const ch = 1024;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const scaleX = vw / cw;
+    const scaleY = vh / ch;
+    const scale = Math.min(scaleX, scaleY);
+    canvas.style.transform = "translate(-50%, -50%) scale(" + scale + ")";
+}
+fitCanvasToViewport();
+window.addEventListener("resize", fitCanvasToViewport);
+
     </script>
 </body>
 </html>
