@@ -9,7 +9,6 @@
         body { background: #000; overflow: hidden; }
         .canvas { width: 576px; height: 1024px; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); transform-origin: center center; }
         
-        .canvas { transform-origin: center center; }
         .elem { position: absolute; }
         .elem img, .elem video { width: 100%; height: 100%; object-fit: cover; }
         .elem video { pointer-events: none; }
@@ -1586,7 +1585,7 @@ function createElemHTML(e, withTransition) {
     const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\'' + e.id + '\')"' : "";
     const hotspotClass = (e.type === "hotspot" && e.showInGame) ? " elem-hotspot-visible" : "";
     const objectClass = e.type === "object" ? " elem-object" : "";
-    const imgTransform = (e.flipH || e.flipV || rotation) ? "transform:scale(" + flipScaleX + "," + flipScaleY + ") rotate(" + rotation + "deg);" : "";
+    const imgTransform = "transform:scale(" + flipScaleX + "," + flipScaleY + ") rotate(" + rotation + "deg);";
     
     let h = '<div class="elem' + (e.type === "draggable" ? " elem-draggable" : "") + hotspotClass + objectClass + transClass + '" data-elem-id="' + e.id + '" style="' + style + '"' + mousedown + click + '>';
     // Inner wrapper for during animation with delay
@@ -1605,7 +1604,7 @@ function createElemHTML(e, withTransition) {
             const imgTop = -(cropY / cropH) * 100;
             h += '<div style="width:100%;height:100%;overflow:hidden;position:relative"><img src="' + e.content + '" style="position:absolute;width:' + imgWidth + '%;height:' + imgHeight + '%;left:' + imgLeft + '%;top:' + imgTop + '%;object-fit:cover;' + imgTransform + 'opacity:' + ((e.opacity !== undefined ? e.opacity : 100) / 100) + ';"></div>';
         } else {
-            h += '<img src="' + e.content + '" style="' + imgTransform + 'opacity:' + ((e.opacity !== undefined ? e.opacity : 100) / 100) + ';">';
+            h += '<img src="' + e.content + '" style="width:100%;height:100%;object-fit:cover;' + imgTransform + 'opacity:' + ((e.opacity !== undefined ? e.opacity : 100) / 100) + ';">';
         }
     }
     if (e.type === "video" && e.content) h += '<video playsinline webkit-playsinline ' + (OPTIMIZE_VIDEO ? 'preload="metadata" ' : '') + (e.autoplay ? 'autoplay ' : '') + (e.loop ? 'loop ' : '') + 'onended="handleVideoEnd(\'' + e.id + '\')" data-video-id="' + e.id + '"><source src="' + e.content + '"></video>';
@@ -1822,20 +1821,6 @@ function handleClick(id) {
 }
 
 render();
-
-function fitCanvasToViewport() {
-    const canvas = document.getElementById("game");
-    const cw = 576;
-    const ch = 1024;
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const scaleX = vw / cw;
-    const scaleY = vh / ch;
-    const scale = Math.min(scaleX, scaleY);
-    canvas.style.transform = "translate(-50%, -50%) scale(" + scale + ")";
-}
-fitCanvasToViewport();
-window.addEventListener("resize", fitCanvasToViewport);
 
     </script>
 </body>
