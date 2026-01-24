@@ -3704,8 +3704,7 @@ function createElemHTML(e, withTransition) {
     const flipScaleY = e.flipV ? -1 : 1;
     const rotation = e.rotation || 0;
     const objectOpacity = (e.opacity !== undefined ? e.opacity : 100) / 100;
-    const objectStyle = e.type === "object" ? ";background:" + (e.objectColor || e.color || "#f7931a") + (e.objectShape === "circle" ? ";border-radius:50%" : "") + (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg);opacity:" + objectOpacity : "";
-    const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s" + objectStyle;
+    const style = "left:" + e.x + "px;top:" + e.y + "px;width:" + e.width + "px;height:" + e.height + "px;z-index:" + e.layer + (e.shape === "circle" ? ";border-radius:50%" : "") + ";animation-duration:" + transDur + "s";
     const mousedown = e.type === "draggable" ? ' onmousedown="handleDragStart(event, \\'' + e.id + '\\')" ontouchstart="handleDragStart(event, \\'' + e.id + '\\')"' : "";
     const click = (e.type === "button" || (e.type === "hotspot" && e.hotspotMode !== "drop")) ? ' onclick="handleClick(\\'' + e.id + '\\')"' : "";
     const hotspotClass = (e.type === "hotspot" && e.showInGame) ? " elem-hotspot-visible" : "";
@@ -3754,7 +3753,14 @@ function createElemHTML(e, withTransition) {
         if (e.contentType === "image" && e.content) h += '<img src="' + e.content + '">';
         else h += '<div style="font-size:' + e.fontSize + 'px;color:#fff;pointer-events:none">' + (e.content || "📦") + '</div>';
     }
-    if (e.type === "object") h += '';
+    if (e.type === "object") {
+        const objStyle = "width:100%;height:100%;background:" + (e.objectColor || e.color || "#f7931a") + 
+            (e.objectShape === "circle" ? ";border-radius:50%" : "") + 
+            (e.objectShape === "triangle" ? ";clip-path:polygon(50% 0%, 0% 100%, 100% 100%)" : "") + 
+            ";transform:scale(" + ((e.scaleX || 1) * flipScaleX) + "," + ((e.scaleY || 1) * flipScaleY) + ") rotate(" + rotation + "deg)" +
+            ";opacity:" + objectOpacity;
+        h += '<div style="' + objStyle + '"></div>';
+    }
     if (e.type === "embed" && e.embedUrl) {
         if (e.embedThumbnail) {
             h += '<img src="' + e.embedThumbnail + '" style="width:100%;height:100%;object-fit:cover;cursor:pointer" onclick="showEmbed(\\'' + e.id + '\\')">';
