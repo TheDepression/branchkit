@@ -3340,6 +3340,9 @@ const STORY_DATA = ${JSON.stringify({ steps, inventoryItems: inventory, varyingI
 const STEPS = STORY_DATA.steps;
 const INVENTORY_ITEMS = STORY_DATA.inventoryItems;
 const VARYING_ITEMS = STORY_DATA.varyingItems;
+const orientation = '${canvasModeParam}';
+const canvasWidth = ${cWidth};
+const canvasHeight = ${cHeight};
 
 let current = STEPS[0].id;
 let visible = {};
@@ -3871,16 +3874,26 @@ function handleDragStart(ev, elemId) {
     const elem = s.elements.find(e => e.id === elemId);
     if (!elem) return;
     draggedElem = elem;
-    const rect = document.getElementById("game").getBoundingClientRect();
-const elemRect = ev.target.getBoundingClientRect();
-const scale = rect.width / canvasWidth;
+    
     const canvas = document.getElementById("game");
     const canvasRect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-    dragOffset.x = (elemRect.left - rect.left) / scale - elem.x;
-dragOffset.y = (elemRect.top - rect.top) / scale - elem.y;
-    dragPos.x = pos.x - canvasRect.left;
-    dragPos.y = pos.y - canvasRect.top;
+    
+    // Calculate the scale factor
+    const scale = canvasRect.width / canvasWidth;
+    
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (pos.x - canvasRect.left) / scale;
+    const canvasY = (pos.y - canvasRect.top) / scale;
+    
+    // Offset is where we clicked within the element
+    dragOffset.x = canvasX - elem.x;
+    dragOffset.y = canvasY - elem.y;
+    
+    // Store current canvas position
+    dragPos.x = canvasX;
+    dragPos.y = canvasY;
+    
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
     document.addEventListener('touchmove', handleDragMove, { passive: false });
@@ -3893,8 +3906,14 @@ function handleDragMove(ev) {
     const canvas = document.getElementById("game");
     const rect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-    dragPos.x = pos.x - rect.left;
-    dragPos.y = pos.y - rect.top;
+    
+    // Calculate the scale factor
+    const scale = rect.width / canvasWidth;
+    
+    // Convert screen coordinates to canvas coordinates
+    dragPos.x = (pos.x - rect.left) / scale;
+    dragPos.y = (pos.y - rect.top) / scale;
+    
     const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
     if (draggedDiv) {
         draggedDiv.style.left = (dragPos.x - dragOffset.x) + 'px';
