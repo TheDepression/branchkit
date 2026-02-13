@@ -3886,23 +3886,18 @@ function handleDragStart(ev, elemId) {
     const elem = s.elements.find(e => e.id === elemId);
     if (!elem) return;
     draggedElem = elem;
-    
     const canvas = document.getElementById("game");
     const canvasRect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
     
-    // Calculate the scale factor
+    // Calculate scale and convert to canvas coordinates
     const scale = canvasRect.width / canvasWidth;
-    
-    // Convert screen coordinates to canvas coordinates
     const canvasX = (pos.x - canvasRect.left) / scale;
     const canvasY = (pos.y - canvasRect.top) / scale;
     
     // Offset is where we clicked within the element
     dragOffset.x = canvasX - elem.x;
     dragOffset.y = canvasY - elem.y;
-    
-    // Store current canvas position
     dragPos.x = canvasX;
     dragPos.y = canvasY;
     
@@ -3919,10 +3914,8 @@ function handleDragMove(ev) {
     const rect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
     
-    // Calculate the scale factor
+    // Calculate scale and convert to canvas coordinates
     const scale = rect.width / canvasWidth;
-    
-    // Convert screen coordinates to canvas coordinates
     dragPos.x = (pos.x - rect.left) / scale;
     dragPos.y = (pos.y - rect.top) / scale;
     
@@ -3939,8 +3932,12 @@ function handleDragEnd(ev) {
     const canvas = document.getElementById("game");
     const rect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-    const dropX = pos.x - rect.left;
-    const dropY = pos.y - rect.top;
+    
+    // Calculate scale and convert to canvas coordinates
+    const scale = rect.width / canvasWidth;
+    const dropX = (pos.x - rect.left) / scale;
+    const dropY = (pos.y - rect.top) / scale;
+    
     s.elements.filter(e => e.type === "hotspot" && visible[e.id] && e.hotspotMode !== "click").forEach(h => {
         if (dropX >= h.x && dropX <= h.x + h.width && dropY >= h.y && dropY <= h.y + h.height) {
             s.events.forEach(ev => {
