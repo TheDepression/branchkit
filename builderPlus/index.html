@@ -2846,44 +2846,33 @@
             };
 
             const handleDragStart = (ev, elem) => {
-    ev.preventDefault();
-    const rect = ev.currentTarget.getBoundingClientRect();
-    const canvas = document.querySelector('.play-canvas');
-    const canvasRect = canvas.getBoundingClientRect();
-    
-    const scale = canvas.offsetWidth / canvasWidth;   // ← this line is new
-
-    setDragOffset({
-        x: (ev.clientX - rect.left) / scale,
-        y: (ev.clientY - rect.top)  / scale
-    });
-    setDraggedItem(elem);
-    setDragPos({ 
-        x: (ev.clientX - canvasRect.left) / scale, 
-        y: (ev.clientY - canvasRect.top)  / scale 
-    });
-};
+                ev.preventDefault();
+                const rect = ev.currentTarget.getBoundingClientRect();
+                const canvas = document.querySelector('.play-canvas');
+                const canvasRect = canvas.getBoundingClientRect();
+                setDragOffset({
+                    x: ev.clientX - rect.left,
+                    y: ev.clientY - rect.top
+                });
+                setDraggedItem(elem);
+                setDragPos({ x: ev.clientX - canvasRect.left, y: ev.clientY - canvasRect.top });
+            };
 
             const handleDragMove = (ev) => {
-    if (!draggedItem) return;
-    ev.preventDefault();
-    const canvas = document.querySelector('.play-canvas');
-    const rect = canvas.getBoundingClientRect();
-    const scale = canvas.offsetWidth / canvasWidth;   // ← add this
-    setDragPos({ 
-        x: (ev.clientX - rect.left) / scale, 
-        y: (ev.clientY - rect.top)  / scale 
-    });
-};
+                if (!draggedItem) return;
+                ev.preventDefault();
+                const canvas = document.querySelector('.play-canvas');
+                const rect = canvas.getBoundingClientRect();
+                setDragPos({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+            };
 
             const handleDragEnd = (ev) => {
                 if (!draggedItem) return;
                 
                 const canvas = document.querySelector('.play-canvas');
                 const rect = canvas.getBoundingClientRect();
-                    const scale = canvas.offsetWidth / canvasWidth;   // ← add this
-    const dropX = (ev.clientX - rect.left) / scale;
-    const dropY = (ev.clientY - rect.top)  / scale;
+                const dropX = ev.clientX - rect.left;
+                const dropY = ev.clientY - rect.top;
 
                 currentStep.elements.filter(e => e.type === 'hotspot' && visibleElements[e.id] && (e.hotspotMode !== 'click')).forEach(hotspot => {
                     if (dropX >= hotspot.x && dropX <= hotspot.x + hotspot.width && 
@@ -3886,8 +3875,9 @@ function handleDragStart(ev, elemId) {
     const canvas = document.getElementById("game");
     const canvasRect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-    dragOffset.x = pos.x - rect.left;
-    dragOffset.y = pos.y - rect.top;
+   const scale = canvas.offsetWidth / (orientation === 'landscape' ? 1920 : 1080);
+dragOffset.x = (pos.x - rect.left) / scale;
+dragOffset.y = (pos.y - rect.top) / scale;
     dragPos.x = pos.x - canvasRect.left;
     dragPos.y = pos.y - canvasRect.top;
     document.addEventListener('mousemove', handleDragMove);
@@ -3971,5 +3961,5 @@ ${fitToViewportJS}
 
         ReactDOM.render(React.createElement(StoryBuilder), document.getElementById('root'));
     </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd228381c6f1b19',t:'MTc3MDk2Mjk2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
