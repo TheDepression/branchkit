@@ -3871,15 +3871,24 @@ function handleDragStart(ev, elemId) {
     const elem = s.elements.find(e => e.id === elemId);
     if (!elem) return;
     draggedElem = elem;
-    const rect = ev.target.getBoundingClientRect();
     const canvas = document.getElementById("game");
     const canvasRect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-   const scale = canvas.offsetWidth / (orientation === 'landscape' ? 1920 : 1080);
-dragOffset.x = (pos.x - rect.left) / scale;
-dragOffset.y = (pos.y - rect.top) / scale;
-    dragPos.x = pos.x - canvasRect.left;
-    dragPos.y = pos.y - canvasRect.top;
+    
+    // Calculate scale
+    const scale = canvasRect.width / (orientation === 'landscape' ? 1920 : 1080);
+    
+    // Convert screen position to canvas coordinates
+    const canvasX = (pos.x - canvasRect.left) / scale;
+    const canvasY = (pos.y - canvasRect.top) / scale;
+    
+    // Offset is where we clicked relative to the element's position
+    dragOffset.x = canvasX - elem.x;
+    dragOffset.y = canvasY - elem.y;
+    
+    dragPos.x = canvasX;
+    dragPos.y = canvasY;
+    
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
     document.addEventListener('touchmove', handleDragMove, { passive: false });
