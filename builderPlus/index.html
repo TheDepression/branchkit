@@ -3901,12 +3901,16 @@ function handleDragMove(ev) {
     const canvas = document.getElementById("game");
     const rect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-    dragPos.x = pos.x - rect.left;
-    dragPos.y = pos.y - rect.top;
+    
+    // Calculate scale and convert to canvas coordinates
+    const scale = rect.width / (orientation === 'landscape' ? 1920 : 1080);
+    dragPos.x = (pos.x - rect.left) / scale;
+    dragPos.y = (pos.y - rect.top) / scale;
+    
     const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
     if (draggedDiv) {
         draggedDiv.style.left = (dragPos.x - dragOffset.x) + 'px';
-draggedDiv.style.top = (dragPos.y - dragOffset.y) + 'px';
+        draggedDiv.style.top = (dragPos.y - dragOffset.y) + 'px';
     }
 }
 
