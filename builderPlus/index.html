@@ -3876,8 +3876,8 @@ function handleDragStart(ev, elemId) {
     const canvasRect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
    const scale = canvas.offsetWidth / (orientation === 'landscape' ? 1920 : 1080);
-dragOffset.x = (pos.x - canvasRect.left - rect.left) / scale;
-dragOffset.y = (pos.y - canvasRect.top - rect.top) / scale;
+dragOffset.x = (pos.x - rect.left) / scale;
+dragOffset.y = (pos.y - rect.top) / scale;
     dragPos.x = pos.x - canvasRect.left;
     dragPos.y = pos.y - canvasRect.top;
     document.addEventListener('mousemove', handleDragMove);
