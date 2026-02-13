@@ -2846,25 +2846,35 @@
             };
 
             const handleDragStart = (ev, elem) => {
-                ev.preventDefault();
-                const rect = ev.currentTarget.getBoundingClientRect();
-                const canvas = document.querySelector('.play-canvas');
-                const canvasRect = canvas.getBoundingClientRect();
-                setDragOffset({
-                    x: ev.clientX - rect.left,
-                    y: ev.clientY - rect.top
-                });
-                setDraggedItem(elem);
-                setDragPos({ x: ev.clientX - canvasRect.left, y: ev.clientY - canvasRect.top });
-            };
+    ev.preventDefault();
+    const canvas = document.querySelector('.play-canvas');
+    const canvasRect = canvas.getBoundingClientRect();
+    
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (ev.clientX - canvasRect.left) / playScale;
+    const canvasY = (ev.clientY - canvasRect.top) / playScale;
+    
+    // Offset is where we clicked within the element
+    setDragOffset({
+        x: canvasX - elem.x,
+        y: canvasY - elem.y
+    });
+    setDraggedItem(elem);
+    setDragPos({ x: canvasX, y: canvasY });
+};
 
-            const handleDragMove = (ev) => {
-                if (!draggedItem) return;
-                ev.preventDefault();
-                const canvas = document.querySelector('.play-canvas');
-                const rect = canvas.getBoundingClientRect();
-                setDragPos({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
-            };
+const handleDragMove = (ev) => {
+    if (!draggedItem) return;
+    ev.preventDefault();
+    const canvas = document.querySelector('.play-canvas');
+    const rect = canvas.getBoundingClientRect();
+    
+    // Convert screen coordinates to canvas coordinates
+    const canvasX = (ev.clientX - rect.left) / playScale;
+    const canvasY = (ev.clientY - rect.top) / playScale;
+    
+    setDragPos({ x: canvasX, y: canvasY });
+};
 
             const handleDragEnd = (ev) => {
                 if (!draggedItem) return;
