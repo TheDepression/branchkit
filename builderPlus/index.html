@@ -3340,9 +3340,6 @@ const STORY_DATA = ${JSON.stringify({ steps, inventoryItems: inventory, varyingI
 const STEPS = STORY_DATA.steps;
 const INVENTORY_ITEMS = STORY_DATA.inventoryItems;
 const VARYING_ITEMS = STORY_DATA.varyingItems;
-const orientation = '${canvasModeParam}';  // ADD THIS LINE
-const canvasWidth = ${cWidth};  // ADD THIS LINE
-const canvasHeight = ${cHeight};  // ADD THIS LINE
 
 let current = STEPS[0].id;
 let visible = {};
@@ -3874,13 +3871,14 @@ function handleDragStart(ev, elemId) {
     const elem = s.elements.find(e => e.id === elemId);
     if (!elem) return;
     draggedElem = elem;
-    const rect = ev.target.getBoundingClientRect();
-const canvas = document.getElementById("game");
-const canvasRect = canvas.getBoundingClientRect();
-const pos = getEventPos(ev);
-const scale = canvasRect.width / canvasWidth;
-dragOffset.x = (pos.x - canvasRect.left - (elem.x * scale)) / scale;
-dragOffset.y = (pos.y - canvasRect.top - (elem.y * scale)) / scale;
+    const rect = document.getElementById("game").getBoundingClientRect();
+const elemRect = ev.target.getBoundingClientRect();
+const scale = rect.width / canvasWidth;
+    const canvas = document.getElementById("game");
+    const canvasRect = canvas.getBoundingClientRect();
+    const pos = getEventPos(ev);
+    dragOffset.x = (elemRect.left - rect.left) / scale - elem.x;
+dragOffset.y = (elemRect.top - rect.top) / scale - elem.y;
     dragPos.x = pos.x - canvasRect.left;
     dragPos.y = pos.y - canvasRect.top;
     document.addEventListener('mousemove', handleDragMove);
@@ -3895,9 +3893,8 @@ function handleDragMove(ev) {
     const canvas = document.getElementById("game");
     const rect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-    const scale = rect.width / canvasWidth;
-dragPos.x = (pos.x - rect.left) / scale;
-dragPos.y = (pos.y - rect.top) / scale;
+    dragPos.x = pos.x - rect.left;
+    dragPos.y = pos.y - rect.top;
     const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
     if (draggedDiv) {
         draggedDiv.style.left = (dragPos.x - dragOffset.x) + 'px';
@@ -3965,5 +3962,5 @@ ${fitToViewportJS}
 
         ReactDOM.render(React.createElement(StoryBuilder), document.getElementById('root'));
     </script>
-<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9cd228381c6f1b19',t:'MTc3MDk2Mjk2OC4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
