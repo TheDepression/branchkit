@@ -2877,28 +2877,30 @@ const handleDragMove = (ev) => {
 };
 
             const handleDragEnd = (ev) => {
-                if (!draggedItem) return;
-                
-                const canvas = document.querySelector('.play-canvas');
-                const rect = canvas.getBoundingClientRect();
-                const dropX = ev.clientX - rect.left;
-                const dropY = ev.clientY - rect.top;
+    if (!draggedItem) return;
+    
+    const canvas = document.querySelector('.play-canvas');
+    const rect = canvas.getBoundingClientRect();
+    
+    // Convert screen coordinates to canvas coordinates
+    const dropX = (ev.clientX - rect.left) / playScale;
+    const dropY = (ev.clientY - rect.top) / playScale;
 
-                currentStep.elements.filter(e => e.type === 'hotspot' && visibleElements[e.id] && (e.hotspotMode !== 'click')).forEach(hotspot => {
-                    if (dropX >= hotspot.x && dropX <= hotspot.x + hotspot.width && 
-                        dropY >= hotspot.y && dropY <= hotspot.y + hotspot.height) {
-                        currentStep.events.forEach(event => {
-                            if (event.trigger.type === 'onDrop' && event.trigger.sourceElement === hotspot.id) {
-                                if (checkCondition(event.condition)) {
-                                    processActions(event.actions);
-                                }
-                            }
-                        });
+    currentStep.elements.filter(e => e.type === 'hotspot' && visibleElements[e.id] && (e.hotspotMode !== 'click')).forEach(hotspot => {
+        if (dropX >= hotspot.x && dropX <= hotspot.x + hotspot.width && 
+            dropY >= hotspot.y && dropY <= hotspot.y + hotspot.height) {
+            currentStep.events.forEach(event => {
+                if (event.trigger.type === 'onDrop' && event.trigger.sourceElement === hotspot.id) {
+                    if (checkCondition(event.condition)) {
+                        processActions(event.actions);
                     }
-                });
+                }
+            });
+        }
+    });
 
-                setDraggedItem(null);
-            };
+    setDraggedItem(null);
+};
 
             useEffect(() => {
                 if (draggedItem) {
