@@ -3875,8 +3875,9 @@ function handleDragStart(ev, elemId) {
     const canvas = document.getElementById("game");
     const canvasRect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-   dragOffset.x = pos.x - rect.left;
-dragOffset.y = pos.y - rect.top;
+   const scale = canvas.offsetWidth / (orientation === 'landscape' ? 1920 : 1080);
+dragOffset.x = (pos.x - canvasRect.left - rect.left) / scale;
+dragOffset.y = (pos.y - canvasRect.top - rect.top) / scale;
     dragPos.x = pos.x - canvasRect.left;
     dragPos.y = pos.y - canvasRect.top;
     document.addEventListener('mousemove', handleDragMove);
@@ -3895,8 +3896,8 @@ function handleDragMove(ev) {
     dragPos.y = pos.y - rect.top;
     const draggedDiv = document.querySelector('[data-elem-id="' + draggedElem.id + '"]');
     if (draggedDiv) {
-        draggedDiv.style.left = (dragPos.x - dragOffset.x) + 'px';
-        draggedDiv.style.top = (dragPos.y - dragOffset.y) + 'px';
+        draggedDiv.style.left = ((dragPos.x - dragOffset.x)) + 'px';
+draggedDiv.style.top = ((dragPos.y - dragOffset.y)) + 'px';
     }
 }
 
