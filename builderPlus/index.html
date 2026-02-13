@@ -3875,7 +3875,8 @@ function handleDragStart(ev, elemId) {
     const canvas = document.getElementById("game");
     const canvasRect = canvas.getBoundingClientRect();
     const pos = getEventPos(ev);
-   const scale = canvas.offsetWidth / (orientation === 'landscape' ? 1920 : 1080);
+   const canvas = document.getElementById("game");
+const scale = canvas.offsetWidth / (orientation === 'landscape' ? 1920 : 1080);
 dragOffset.x = (pos.x - rect.left) / scale;
 dragOffset.y = (pos.y - rect.top) / scale;
     dragPos.x = pos.x - canvasRect.left;
