@@ -3875,12 +3875,12 @@ function handleDragStart(ev, elemId) {
     if (!elem) return;
     draggedElem = elem;
     const rect = ev.target.getBoundingClientRect();
-    const canvas = document.getElementById("game");
-    const canvasRect = canvas.getBoundingClientRect();
-    const pos = getEventPos(ev);
-    const scale = canvasRect.width / canvasWidth;
-dragOffset.x = (pos.x - rect.left) / scale;
-dragOffset.y = (pos.y - rect.top) / scale;
+const canvas = document.getElementById("game");
+const canvasRect = canvas.getBoundingClientRect();
+const pos = getEventPos(ev);
+const scale = canvasRect.width / canvasWidth;
+dragOffset.x = (pos.x - canvasRect.left - (elem.x * scale)) / scale;
+dragOffset.y = (pos.y - canvasRect.top - (elem.y * scale)) / scale;
     dragPos.x = pos.x - canvasRect.left;
     dragPos.y = pos.y - canvasRect.top;
     document.addEventListener('mousemove', handleDragMove);
